@@ -2,11 +2,11 @@
 
 A `wc` clone in Rust.
 
-
 ## Synopsis
 
 ```
-cw 0.1.0
+-% cw --help
+cw 0.2.0
 Thomas Hurst <tom@hur.st>
 Count Words - word, line, character and byte count
 
@@ -24,52 +24,101 @@ FLAGS:
 
 ARGS:
     <input>...    Input files
-```
 
+-% cw Dickens_Charles_Pickwick_Papers.xml
+ 3449440 51715840 341152640 Dickens_Charles_Pickwick_Papers.xml
+```
 
 ## Performance
 
 It's quite fast.  Line counts are optimized using the `bytecount` crate:
 
 ```
--% dd if=pwned-passwords-1.0.txt of=/dev/null bs=32k
-392544+1 records in
-392544+1 records out
-12862899504 bytes transferred in 21.437070 secs (600030675 bytes/sec)
-21.440 real, 0.173 user, 21.264 sys
+Benchmark #1: wc -l Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):     439.7 ms ±   2.0 ms    [User: 354.9 ms, System: 84.5 ms]
+  Range (min … max):   435.3 ms … 441.4 ms
 
--% wc -l pwned-passwords-1.0.txt
- 306259512 pwned-passwords-1.0.txt
-39.252 real, 18.679 user, 20.569 sys
+Benchmark #2: gwc -l Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):     533.0 ms ±   1.7 ms    [User: 388.8 ms, System: 144.0 ms]
+  Range (min … max):   530.9 ms … 535.1 ms
 
--% cw -l pwned-passwords-1.0.txt
- 306259512 pwned-passwords-1.0.txt
-21.935 real, 1.070 user, 20.857 sys
+Benchmark #3: cw -l Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):     127.9 ms ±   1.5 ms    [User: 24.1 ms, System: 103.7 ms]
+  Range (min … max):   125.1 ms … 131.3 ms
+
+Summary
+  'cw -l Dickens_Charles_Pickwick_Papers.xml' ran
+    3.44 ± 0.04 times faster than 'wc -l Dickens_Charles_Pickwick_Papers.xml'
+    4.17 ± 0.05 times faster than 'gwc -l Dickens_Charles_Pickwick_Papers.xml'
 ```
 
-Other counts are probably faster because there's no multibyte handling by default:
+Line counts with line length are optimized using the `memchr` crate:
 
 ```
--% wc pwned-passwords-1.0.txt
- 306259512 306259512 12862899504 pwned-passwords-1.0.txt
-1:57.72 real, 1:37.12 user, 20.592 sys
+Benchmark #1: wc -lL Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):     441.6 ms ±   1.8 ms    [User: 354.7 ms, System: 86.5 ms]
+  Range (min … max):   438.5 ms … 443.8 ms
 
--% cw pwned-passwords-1.0.txt
- 306259512 306259512 12862899504 pwned-passwords-1.0.txt
-1:03.70 real, 42.798 user, 20.899 sys
+Benchmark #2: gwc -lL Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):      3.851 s ±  0.005 s    [User: 3.710 s, System: 0.141 s]
+  Range (min … max):    3.847 s …  3.864 s
+
+Benchmark #3: cw -lL Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):     255.6 ms ±   1.1 ms    [User: 154.6 ms, System: 100.9 ms]
+  Range (min … max):   253.3 ms … 256.9 ms
+
+Summary
+  'cw -lL Dickens_Charles_Pickwick_Papers.xml' ran
+    1.73 ± 0.01 times faster than 'wc -lL Dickens_Charles_Pickwick_Papers.xml'
+   15.07 ± 0.07 times faster than 'gwc -lL Dickens_Charles_Pickwick_Papers.xml'
 ```
 
-But even using UTF-8 processing it's not bad:
+Note without `-m` cw only operates on bytes, and it never cares about your locale.
 
 ```
--% wc -mLlw pwned-passwords-1.0.txt
- 306259512 306259512 12862899504      41 pwned-passwords-1.0.txt
-5:53.70 real, 5:32.75 user, 20.920 sys
+Benchmark #1: wc Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):      2.708 s ±  0.002 s    [User: 2.612 s, System: 0.095 s]
+  Range (min … max):    2.706 s …  2.712 s
 
--% cw -mLlw pwned-passwords-1.0.txt
- 306259512 306259512 12862899504      41 pwned-passwords-1.0.txt
-2:15.46 real, 1:54.45 user, 21.008 sys
+Benchmark #2: gwc Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):      3.851 s ±  0.003 s    [User: 3.714 s, System: 0.136 s]
+  Range (min … max):    3.847 s …  3.856 s
+
+Benchmark #3: cw Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):      2.026 s ±  0.001 s    [User: 1.939 s, System: 0.087 s]
+  Range (min … max):    2.024 s …  2.028 s
+
+Summary
+  'cw Dickens_Charles_Pickwick_Papers.xml' ran
+    1.34 ± 0.00 times faster than 'wc Dickens_Charles_Pickwick_Papers.xml'
+    1.90 ± 0.00 times faster than 'gwc Dickens_Charles_Pickwick_Papers.xml'
 ```
+
+`-m` enables UTF-8 processing, and currently has no fast paths.
+
+```
+Benchmark #1: wc -mLlw Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):      8.972 s ±  0.019 s    [User: 8.875 s, System: 0.096 s]
+  Range (min … max):    8.958 s …  9.013 s
+
+  Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet PC without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
+
+Benchmark #2: gwc -mLlw Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):      3.852 s ±  0.008 s    [User: 3.700 s, System: 0.151 s]
+  Range (min … max):    3.846 s …  3.867 s
+
+Benchmark #3: cw -mLlw Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):      3.721 s ±  0.003 s    [User: 3.598 s, System: 0.123 s]
+  Range (min … max):    3.715 s …  3.726 s
+
+Summary
+  'cw -mLlw Dickens_Charles_Pickwick_Papers.xml' ran
+    1.04 ± 0.00 times faster than 'gwc -mLlw Dickens_Charles_Pickwick_Papers.xml'
+    2.41 ± 0.01 times faster than 'wc -mLlw Dickens_Charles_Pickwick_Papers.xml'
+```
+
+These tests are on FreeBSD 12 on a 2.1GHz Westmere Xeon.  `gwc` is from GNU
+coreutils 8.30.
 
 For best results build with:
 
