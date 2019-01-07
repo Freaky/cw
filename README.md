@@ -31,7 +31,7 @@ ARGS:
 
 ## Performance
 
-It's quite fast.  Line counts are optimized using the `bytecount` crate:
+Line counts are optimized using the `bytecount` crate:
 
 ```
 Benchmark #1: wc -l Dickens_Charles_Pickwick_Papers.xml
@@ -128,3 +128,42 @@ cargo build --release --features runtime-dispatch-simd
 
 This enables SIMD optimizations for line counting.  It has no effect if you have
 it count anything else.
+
+
+## Future
+
+ * Test suite.
+ * Refactor to reduce the code sprawl.
+ * Improve `SIGINFO` support.
+ * Factor internals out into a library. (#1)
+ * Improve multibyte support.
+ * Possibly implement locale.
+ * Replace clap/structopt with something lighter.
+
+## See Also
+
+### [uwc]
+
+[uwc] focuses on following Unicode rules as precisely as possible, taking into
+account less-common newlines, counting graphemes as well as codepoints, and
+following Unicode word-boundary rules precisely.
+
+The cost of this is currently a great deal of performance, with counts on my
+benchmark file taking over a minute.
+
+
+### [rwc]
+
+cw was originally called [rwc] until I noticed this existed.  It's quite old and
+doesn't appear to compile.
+
+
+### [linecount]
+
+A little library that only does plain newline counting, along with a binary
+called `lc`.  Version 0.2 will use the same algorithm as `cw`.
+
+
+[uwc]: https://crates.io/crates/uwc
+[rwc]: https://crates.io/crates/rwc
+[linecount]: https://crates.io/crates/linecount
