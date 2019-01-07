@@ -237,6 +237,42 @@ fn count_bytes<R: Read>(r: R, mut total: &mut Counts) -> io::Result<Counts> {
     Ok(count)
 }
 
+// Count UTF-8 codepoints
+fn count_codepoints<R: Read>(r: R, mut total: &mut Counts) -> io::Result<Counts> {
+    let mut count = Counts::default();
+    let mut reader = BufReader::with_capacity(READ_SIZE, r);
+
+    loop {
+        let len = {
+            let buf = reader.fill_buf()?;
+            if buf.is_empty() {
+                break;
+            }
+
+            // http://canonical.org/~kragen/strlen-utf8
+            //
+            // Counting bytes that don't start 0b10
+            for b in buf {
+                if (b & 0xc0) != 0x80 {
+                    count.chars += 1;
+                }
+            }
+
+            buf.len()
+        };
+        count.bytes += len as u64;
+
+        reader.consume(len);
+
+        if sig::check_signal() {
+            println!("{:?}", count);
+        }
+    }
+    total.chars += count.chars;
+    total.bytes += count.bytes;
+    Ok(count)
+}
+
 // Slow path: UTF-8 processing and additional copying on top.
 fn count_chars<R: Read>(r: R, mut total: &mut Counts) -> io::Result<Counts> {
     let mut count = Counts::default();
@@ -312,6 +348,7 @@ fn main() -> io::Result<()> {
     let lines_only = opt.lines && !(opt.words || opt.chars || opt.longest_line);
     let lines_longest_only = opt.lines && !(opt.words || opt.chars);
     let bytes_only = opt.bytes && !(opt.words || opt.chars || opt.lines || opt.longest_line);
+    let chars_only = opt.chars && !(opt.words || opt.lines || opt.longest_line);
 
     let print_count = |cnt: &Counts| {
         if opt.lines {
@@ -342,6 +379,8 @@ fn main() -> io::Result<()> {
     if opt.input.is_empty() {
         let count = if lines_only {
             count_lines(io::stdin(), &mut total)?
+        } else if chars_only {
+            count_codepoints(io::stdin(), &mut total)?
         } else if opt.chars {
             count_chars(io::stdin(), &mut total)?
         } else if lines_longest_only {
@@ -374,6 +413,8 @@ fn main() -> io::Result<()> {
         let count = File::open(path).and_then(|fd| {
             if lines_only {
                 count_lines(fd, &mut total)
+            } else if chars_only {
+                count_codepoints(fd, &mut total)
             } else if opt.chars {
                 count_chars(fd, &mut total)
             } else if lines_longest_only {

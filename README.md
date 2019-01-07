@@ -94,7 +94,47 @@ Summary
     1.90 ± 0.00 times faster than 'gwc Dickens_Charles_Pickwick_Papers.xml'
 ```
 
-`-m` enables UTF-8 processing, and currently has no fast paths.
+`-m` enables UTF-8 processing, with a fast-path for character length:
+
+```
+Benchmark #1: wc -m Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):      8.965 s ±  0.007 s    [User: 8.870 s, System: 0.094 s]
+  Range (min … max):    8.959 s …  8.980 s
+
+Benchmark #2: gwc -m Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):      3.847 s ±  0.003 s    [User: 3.703 s, System: 0.144 s]
+  Range (min … max):    3.843 s …  3.853 s
+
+Benchmark #3: cw -m Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):      1.068 s ±  0.001 s    [User: 986.8 ms, System: 81.1 ms]
+  Range (min … max):    1.066 s …  1.072 s
+
+Summary
+  'cw -m Dickens_Charles_Pickwick_Papers.xml' ran
+    3.60 ± 0.01 times faster than 'gwc -m Dickens_Charles_Pickwick_Papers.xml'
+    8.39 ± 0.01 times faster than 'wc -m Dickens_Charles_Pickwick_Papers.xml'
+```
+
+```
+Benchmark #1: wc -m test-utf-8.html
+  Time (mean ± σ):      1.181 s ±  0.001 s    [User: 1.169 s, System: 0.012 s]
+  Range (min … max):    1.180 s …  1.184 s
+
+Benchmark #2: gwc -m test-utf-8.html
+  Time (mean ± σ):      1.730 s ±  0.002 s    [User: 1.713 s, System: 0.017 s]
+  Range (min … max):    1.728 s …  1.735 s
+
+Benchmark #3: target/release/cw -m test-utf-8.html
+  Time (mean ± σ):      95.6 ms ±   0.3 ms    [User: 88.4 ms, System: 7.4 ms]
+  Range (min … max):    94.5 ms …  96.1 ms
+
+Summary
+  'target/release/cw -m test-utf-8.html' ran
+   12.36 ± 0.04 times faster than 'wc -m test-utf-8.html'
+   18.11 ± 0.06 times faster than 'gwc -m test-utf-8.html'
+```
+
+And a slow path for everything else:
 
 ```
 Benchmark #1: wc -mLlw Dickens_Charles_Pickwick_Papers.xml
