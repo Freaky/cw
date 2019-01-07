@@ -1,3 +1,4 @@
+use memchr::memchr_iter;
 use std::fs::File;
 use std::io;
 use std::io::BufRead;
@@ -95,6 +96,10 @@ struct Counts {
     longest_line: u64,
 }
 
+// Count lines and bytes
+// Fastest approach: just use an optimized bytecount for \n
+//
+// ~2x faster than count_lines_longest
 fn count_lines<R: Read>(r: R, mut total: &mut Counts) -> io::Result<Counts> {
     let mut count = Counts::default();
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
@@ -119,6 +124,61 @@ fn count_lines<R: Read>(r: R, mut total: &mut Counts) -> io::Result<Counts> {
     Ok(count)
 }
 
+// Count lines, line length, and bytes
+// Use memchr to find newlines
+//
+// ~9x faster than count_bytes
+fn count_lines_longest<R: Read>(r: R, mut total: &mut Counts) -> io::Result<Counts> {
+    let mut count = Counts::default();
+    let mut reader = BufReader::with_capacity(READ_SIZE, r);
+
+    let mut line_len = 0_u64;
+
+    loop {
+        let len = {
+            let buf = reader.fill_buf()?;
+            if buf.is_empty() {
+                break;
+            }
+
+            let mut last_pos = 0;
+            for pos in memchr_iter(b'\n', buf) {
+                line_len += ((pos - last_pos as usize) - 1) as u64;
+
+                if count.longest_line < line_len {
+                    count.longest_line = line_len;
+                }
+
+                line_len = 0;
+
+                count.lines += 1;
+                last_pos = pos as u64;
+            }
+
+            line_len = (buf.len() - last_pos as usize) as u64;
+
+            buf.len()
+        };
+        count.bytes += len as u64;
+        reader.consume(len);
+
+        if sig::check_signal() {
+            println!("{:?}", count);
+        }
+    }
+    total.lines += count.lines;
+    total.bytes += count.bytes;
+
+    if total.longest_line < count.longest_line {
+        total.longest_line = count.longest_line;
+    }
+
+    Ok(count)
+}
+
+// Count everything, but only using bytes
+//
+// 1.8x faster than count_chars
 fn count_bytes<R: Read>(r: R, mut total: &mut Counts) -> io::Result<Counts> {
     let mut count = Counts::default();
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
@@ -177,6 +237,7 @@ fn count_bytes<R: Read>(r: R, mut total: &mut Counts) -> io::Result<Counts> {
     Ok(count)
 }
 
+// Slow path: UTF-8 processing and additional copying on top.
 fn count_chars<R: Read>(r: R, mut total: &mut Counts) -> io::Result<Counts> {
     let mut count = Counts::default();
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
@@ -249,6 +310,7 @@ fn main() -> io::Result<()> {
     }
 
     let lines_only = opt.lines && !(opt.words || opt.chars || opt.longest_line);
+    let lines_longest_only = opt.lines && !(opt.words || opt.chars);
     let bytes_only = opt.bytes && !(opt.words || opt.chars || opt.lines || opt.longest_line);
 
     let print_count = |cnt: &Counts| {
@@ -282,6 +344,8 @@ fn main() -> io::Result<()> {
             count_lines(io::stdin(), &mut total)?
         } else if opt.chars {
             count_chars(io::stdin(), &mut total)?
+        } else if lines_longest_only {
+            count_lines_longest(io::stdin(), &mut total)?
         } else {
             count_bytes(io::stdin(), &mut total)?
         };
@@ -312,6 +376,8 @@ fn main() -> io::Result<()> {
                 count_lines(fd, &mut total)
             } else if opt.chars {
                 count_chars(fd, &mut total)
+            } else if lines_longest_only {
+                count_lines_longest(fd, &mut total)
             } else {
                 count_bytes(fd, &mut total)
             }
