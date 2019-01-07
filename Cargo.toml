@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Thomas Hurst <tom@hur.st>"]
 license = "MIT"
 description = "Count Words, a wc clone"
+repository = "https://github.com/Freaky/cw"
+keywords = ["wc", "word", "count"]
+categories = [ "command-line-utilities", "text-processing" ]
 edition = "2018"
 
 [dependencies]
