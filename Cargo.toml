@@ -1,0 +1,15 @@
+[package]
+name = "cw"
+version = "0.1.0"
+authors = ["Thomas Hurst <tom@hur.st>"]
+license = "MIT"
+description = "Count Words, a wc clone"
+edition = "2018"
+
+[dependencies]
+bytecount = "0.4.0"
+structopt = "0.2.14"
+
+[features]
+runtime-dispatch-simd = ["bytecount/runtime-dispatch-simd"]
+generic-simd = ["bytecount/generic-simd"]
