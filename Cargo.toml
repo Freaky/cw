@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Thomas Hurst <tom@hur.st>"]
 license = "MIT"
 description = "Count Words, a wc clone"
+readme = "README.md"
 repository = "https://github.com/Freaky/cw"
 keywords = ["wc", "word", "count"]
 categories = [ "command-line-utilities", "text-processing" ]
