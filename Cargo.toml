@@ -12,6 +12,7 @@ edition = "2018"
 [dependencies]
 bytecount = "0.4.0"
 structopt = "0.2.14"
+libc = "0.2.46"
 
 [features]
 runtime-dispatch-simd = ["bytecount/runtime-dispatch-simd"]

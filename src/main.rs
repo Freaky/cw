@@ -8,6 +8,57 @@ use structopt::StructOpt;
 
 const READ_SIZE: usize = 1024 * 32;
 
+#[cfg(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "dragonfly",
+    target_os = "openbsd",
+    target_os = "netbsd",
+    target_os = "bitrig"
+))]
+mod sig {
+    use libc::{c_int, c_void, sighandler_t, signal, SIGINFO};
+    use std::sync::atomic::{AtomicBool, Ordering, ATOMIC_BOOL_INIT};
+
+    static SIGINFO_RECEIVED: AtomicBool = ATOMIC_BOOL_INIT;
+
+    extern "C" fn trigger_signal(_: c_int) {
+        SIGINFO_RECEIVED.store(true, Ordering::Release);
+    }
+
+    fn get_handler() -> sighandler_t {
+        trigger_signal as extern "C" fn(c_int) as *mut c_void as sighandler_t
+    }
+
+    pub fn check_signal() -> bool {
+        SIGINFO_RECEIVED.swap(false, Ordering::AcqRel)
+    }
+
+    pub fn hook_signal() {
+        unsafe {
+            signal(SIGINFO, get_handler());
+        }
+    }
+}
+
+#[cfg(not(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "dragonfly",
+    target_os = "openbsd",
+    target_os = "netbsd",
+    target_os = "bitrig"
+)))]
+mod sig {
+    pub fn check_signal() -> bool {
+        false
+    }
+
+    pub fn hook_signal() {}
+}
+
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "cw",
@@ -58,6 +109,10 @@ fn count_lines<R: Read>(r: R, mut total: &mut Counts) -> io::Result<Counts> {
         };
         count.bytes += len as u64;
         reader.consume(len);
+
+        if sig::check_signal() {
+            println!("{:?}", count);
+        }
     }
     total.lines += count.lines;
     total.bytes += count.bytes;
@@ -105,6 +160,10 @@ fn count_bytes<R: Read>(r: R, mut total: &mut Counts) -> io::Result<Counts> {
         };
 
         reader.consume(len);
+
+        if sig::check_signal() {
+            println!("{:?}", count);
+        }
     }
 
     total.bytes += count.bytes;
@@ -152,6 +211,10 @@ fn count_chars<R: Read>(r: R, mut total: &mut Counts) -> io::Result<Counts> {
             }
         }
         buf.clear();
+
+        if sig::check_signal() {
+            println!("{:?}", count);
+        }
     }
 
     total.chars += count.chars;
@@ -172,6 +235,8 @@ fn main() -> io::Result<()> {
         ..Counts::default()
     };
     let mut exit_code = 0;
+
+    sig::hook_signal();
 
     if !(opt.bytes || opt.words || opt.chars || opt.lines || opt.longest_line) {
         opt.lines = true;
