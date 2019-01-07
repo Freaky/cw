@@ -77,5 +77,5 @@ For best results build with:
 cargo build --release --features runtime-dispatch-simd
 ```
 
-This enables SIMD optimizations for line counting.  It has no affect if you have
+This enables SIMD optimizations for line counting.  It has no effect if you have
 it count anything else.
