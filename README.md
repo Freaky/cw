@@ -124,12 +124,12 @@ Benchmark #2: gwc -m test-utf-8.html
   Time (mean ± σ):      1.730 s ±  0.002 s    [User: 1.713 s, System: 0.017 s]
   Range (min … max):    1.728 s …  1.735 s
 
-Benchmark #3: target/release/cw -m test-utf-8.html
+Benchmark #3: cw -m test-utf-8.html
   Time (mean ± σ):      95.6 ms ±   0.3 ms    [User: 88.4 ms, System: 7.4 ms]
   Range (min … max):    94.5 ms …  96.1 ms
 
 Summary
-  'target/release/cw -m test-utf-8.html' ran
+  'cw -m test-utf-8.html' ran
    12.36 ± 0.04 times faster than 'wc -m test-utf-8.html'
    18.11 ± 0.06 times faster than 'gwc -m test-utf-8.html'
 ```
