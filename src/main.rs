@@ -183,7 +183,7 @@ fn count_bytes<R: Read>(r: R, mut total: &mut Counts) -> io::Result<Counts> {
     let mut count = Counts::default();
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
 
-    let mut line_len = 0;
+    let mut line_len = 0_u64;
     let mut in_word = false;
 
     loop {
@@ -242,7 +242,7 @@ fn count_chars<R: Read>(r: R, mut total: &mut Counts) -> io::Result<Counts> {
     let mut count = Counts::default();
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
 
-    let mut line_len = 0;
+    let mut line_len = 0_u64;
     let mut in_word = false;
 
     // Lines are useful sync points for multibyte reading
