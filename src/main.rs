@@ -259,7 +259,7 @@ fn main() -> io::Result<()> {
             }
             Err(e) => {
                 exit_code = 1;
-                eprintln!("{:?}", e);
+                eprintln!("{}: {}", path.display(), e);
             }
         }
     }
