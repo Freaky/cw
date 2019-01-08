@@ -97,6 +97,13 @@ struct Counts {
 }
 
 impl Counts {
+    fn new<P: Into<PathBuf>>(path: Option<P>) -> Self {
+        Self {
+            path: path.map(|p| p.into()),
+            ..Self::default()
+        }
+    }
+
     fn add(&mut self, other: &Counts) {
         self.lines += other.lines;
         self.words += other.words;
@@ -315,10 +322,7 @@ fn count_chars<R: Read>(r: R) -> io::Result<Counts> {
 
 fn main() -> io::Result<()> {
     let mut opt = Opt::from_args();
-    let mut total = Counts {
-        path: Some(PathBuf::from("total")),
-        ..Counts::default()
-    };
+    let mut total = Counts::new(Some("total"));
     let mut exit_code = 0;
 
     sig::hook_signal();
