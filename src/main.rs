@@ -1,3 +1,4 @@
+use std::io::Write;
 use memchr::memchr_iter;
 use std::fs::File;
 use std::io;
@@ -113,6 +114,32 @@ impl Counts {
         if self.longest_line < other.longest_line {
             self.longest_line = other.longest_line
         }
+    }
+
+    fn print<W: Write>(&self, opt: &Opt, mut out: W) -> io::Result<()> {
+        if opt.lines {
+            write!(&mut out, " {:>7}", self.lines)?;
+        }
+
+        if opt.words {
+            write!(&mut out, " {:>7}", self.words)?;
+        }
+
+        if opt.chars {
+            write!(&mut out, " {:>7}", self.chars)?;
+        } else if opt.bytes {
+            write!(&mut out, " {:>7}", self.bytes)?;
+        }
+
+        if opt.longest_line {
+            write!(&mut out, " {:>7}", self.longest_line)?;
+        }
+
+        if let Some(ref path) = self.path {
+            write!(&mut out, " {}", path.display())?;
+        }
+
+        writeln!(&mut out)
     }
 }
 
@@ -323,6 +350,8 @@ fn count_chars<R: Read>(r: R) -> io::Result<Counts> {
 fn main() -> io::Result<()> {
     let mut opt = Opt::from_args();
     let mut total = Counts::new(Some("total"));
+    let stdout = io::stdout();
+    let mut out = stdout.lock();
     let mut exit_code = 0;
 
     sig::hook_signal();
@@ -342,32 +371,6 @@ fn main() -> io::Result<()> {
     let bytes_only = opt.bytes && !(opt.words || opt.chars || opt.lines || opt.longest_line);
     let chars_only = opt.chars && !(opt.words || opt.lines || opt.longest_line);
 
-    let print_count = |cnt: &Counts| {
-        if opt.lines {
-            print!(" {:>7}", cnt.lines);
-        }
-
-        if opt.words {
-            print!(" {:>7}", cnt.words);
-        }
-
-        if opt.chars {
-            print!(" {:>7}", cnt.chars);
-        } else if opt.bytes {
-            print!(" {:>7}", cnt.bytes);
-        }
-
-        if opt.longest_line {
-            print!(" {:>7}", cnt.longest_line);
-        }
-
-        if let Some(ref path) = cnt.path {
-            print!(" {}", path.display());
-        }
-
-        println!();
-    };
-
     if opt.input.is_empty() {
         let count = if lines_only {
             count_lines(io::stdin())?
@@ -380,7 +383,7 @@ fn main() -> io::Result<()> {
         } else {
             count_bytes(io::stdin())?
         };
-        print_count(&count);
+        count.print(&opt, &mut out)?;
     }
 
     for path in &opt.input {
@@ -397,7 +400,7 @@ fn main() -> io::Result<()> {
 
             if let Some(count) = count {
                 total.bytes += count.bytes;
-                print_count(&count);
+                count.print(&opt, &mut out)?;
                 continue;
             }
         }
@@ -420,7 +423,7 @@ fn main() -> io::Result<()> {
             Ok(mut count) => {
                 total.add(&count);
                 count.path = Some(path.clone());
-                print_count(&count);
+                count.print(&opt, &mut out)?;
             }
             Err(e) => {
                 exit_code = 1;
@@ -430,7 +433,7 @@ fn main() -> io::Result<()> {
     }
 
     if opt.input.len() > 1 {
-        print_count(&total);
+        total.print(&opt, &mut out)?;
     }
 
     std::process::exit(exit_code);
