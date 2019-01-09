@@ -97,10 +97,132 @@ struct Counts {
     longest_line: u64,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum Impl {
+    Lines,      // -l, -lc (bytecount)
+    LinesMax,   // -lL, -lLc (memchr)
+    Codepoints, // -m, -lm, -lLm (custom UTF-8 strlen)
+    BytesOnly,  // -c (fs stat or just counting read length)
+    Bytes,      // no args, -w, -lw, -lwc (bytewise)
+    Unicode     // -mw (String + charwise)
+}
+
+impl Default for Impl {
+    fn default() -> Self {
+        Impl::Bytes
+    }
+}
+
+impl Impl {
+    fn count<R: Read>(self, r: R, mut count: &mut Counts) -> io::Result<()> {
+        match self {
+            Impl::Lines | Impl::BytesOnly => count_lines(r, &mut count),
+            Impl::LinesMax => count_lines_longest(r, &mut count),
+            Impl::Codepoints => count_codepoints(r, &mut count),
+            Impl::Bytes => count_bytes(r, &mut count),
+            Impl::Unicode => count_chars(r, &mut count)
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct Strategy {
+    id: Impl,
+    rank: u32,
+    lines: bool,
+    words: bool,
+    bytes: bool,
+    chars: bool,
+    longest_line: bool,
+}
+
+impl Strategy {
+    fn is_usable(&self, opt: &Opt) -> bool {
+        (!opt.lines || self.lines) &&
+        (!opt.bytes || self.bytes) &&
+        (!opt.chars || self.chars) &&
+        (!opt.words || (self.words && self.chars == opt.chars)) &&
+        (!opt.longest_line || (self.longest_line && self.chars == opt.chars))
+    }
+}
+
+struct Strategies(Vec<Strategy>);
+
+impl Strategies {
+    fn new() -> Self {
+        let mut strategies: Vec<Strategy> = vec![];
+
+        strategies.push(Strategy {
+            id: Impl::BytesOnly,
+            rank: 0,
+            bytes: true,
+            ..Strategy::default()
+        });
+
+        strategies.push(Strategy {
+            id: Impl::Lines,
+            rank: 1,
+            bytes: true,
+            lines: true,
+            ..Strategy::default()
+        });
+
+        strategies.push(Strategy {
+            id: Impl::LinesMax,
+            rank: 3,
+            bytes: true,
+            lines: true,
+            longest_line: true,
+            ..Strategy::default()
+        });
+
+        strategies.push(Strategy {
+            id: Impl::Codepoints,
+            rank: 6,
+            chars: true,
+            bytes: true,
+            lines: true,
+            longest_line: true,
+            ..Strategy::default()
+        });
+
+        strategies.push(Strategy {
+            id: Impl::Bytes,
+            rank: 100,
+            words: true,
+            bytes: true,
+            lines: true,
+            longest_line: true,
+            ..Strategy::default()
+        });
+
+        strategies.push(Strategy {
+            id: Impl::Unicode,
+            rank: 1000,
+            words: true,
+            bytes: true,
+            chars: true,
+            lines: true,
+            longest_line: true,
+        });
+
+        Strategies(strategies)
+    }
+
+    fn select(&self, opt: &Opt) -> Impl {
+        self.0
+            .iter()
+            .filter(|s| s.is_usable(&opt))
+            .min_by(|a,b| a.rank.cmp(&b.rank))
+            .map(|s| s.id)
+            .expect("[BUG] Unable to find a suitable implementation")
+    }
+}
+
 impl Counts {
-    fn new<P: Into<PathBuf>>(path: Option<P>) -> Self {
+    fn new<P: Into<PathBuf>>(path: P) -> Self {
         Self {
-            path: path.map(|p| p.into()),
+            path: Some(path.into()),
             ..Self::default()
         }
     }
@@ -147,8 +269,7 @@ impl Counts {
 // Fastest approach: just use an optimized bytecount for \n
 //
 // ~2x faster than count_lines_longest
-fn count_lines<R: Read>(r: R) -> io::Result<Counts> {
-    let mut count = Counts::default();
+fn count_lines<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
     loop {
         let len = {
@@ -163,18 +284,18 @@ fn count_lines<R: Read>(r: R) -> io::Result<Counts> {
         reader.consume(len);
 
         if sig::check_signal() {
-            println!("{:?}", count);
+            eprintln!("{:?}", count);
         }
     }
-    Ok(count)
+
+    Ok(())
 }
 
 // Count lines, line length, and bytes
 // Use memchr to find newlines
 //
 // ~9x faster than count_bytes
-fn count_lines_longest<R: Read>(r: R) -> io::Result<Counts> {
-    let mut count = Counts::default();
+fn count_lines_longest<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
 
     let mut line_len = 0_u64;
@@ -208,18 +329,17 @@ fn count_lines_longest<R: Read>(r: R) -> io::Result<Counts> {
         reader.consume(len);
 
         if sig::check_signal() {
-            println!("{:?}", count);
+            eprintln!("{:?}", count);
         }
     }
 
-    Ok(count)
+    Ok(())
 }
 
 // Count everything, but only using bytes
 //
 // 1.8x faster than count_chars
-fn count_bytes<R: Read>(r: R) -> io::Result<Counts> {
-    let mut count = Counts::default();
+fn count_bytes<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
 
     let mut line_len = 0_u64;
@@ -261,17 +381,18 @@ fn count_bytes<R: Read>(r: R) -> io::Result<Counts> {
         reader.consume(len);
 
         if sig::check_signal() {
-            println!("{:?}", count);
+            eprintln!("{:?}", count);
         }
     }
 
-    Ok(count)
+    Ok(())
 }
 
 // Count UTF-8 codepoints
-fn count_codepoints<R: Read>(r: R) -> io::Result<Counts> {
-    let mut count = Counts::default();
+fn count_codepoints<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
+
+    let mut last_chars = 0;
 
     loop {
         let len = {
@@ -286,6 +407,16 @@ fn count_codepoints<R: Read>(r: R) -> io::Result<Counts> {
             for b in buf {
                 if (b & 0xc0) != 0x80 {
                     count.chars += 1;
+
+                    if *b == b'\n' {
+                        let line_len = count.chars - last_chars;
+                        last_chars = count.chars;
+
+                        if count.longest_line < line_len {
+                            count.longest_line = line_len
+                        }
+                        count.lines += 1;
+                    }
                 }
             }
 
@@ -296,16 +427,15 @@ fn count_codepoints<R: Read>(r: R) -> io::Result<Counts> {
         reader.consume(len);
 
         if sig::check_signal() {
-            println!("{:?}", count);
+            eprintln!("{:?}", count);
         }
     }
 
-    Ok(count)
+    Ok(())
 }
 
 // Slow path: UTF-8 processing and additional copying on top.
-fn count_chars<R: Read>(r: R) -> io::Result<Counts> {
-    let mut count = Counts::default();
+fn count_chars<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
 
     let mut line_len = 0_u64;
@@ -344,12 +474,12 @@ fn count_chars<R: Read>(r: R) -> io::Result<Counts> {
         }
     }
 
-    Ok(count)
+    Ok(())
 }
 
 fn main() -> io::Result<()> {
     let mut opt = Opt::from_args();
-    let mut total = Counts::new(Some("total"));
+    let mut total = Counts::new("total");
     let stdout = io::stdout();
     let mut out = stdout.lock();
     let mut exit_code = 0;
@@ -366,28 +496,18 @@ fn main() -> io::Result<()> {
         opt.bytes = false;
     }
 
-    let lines_only = opt.lines && !(opt.words || opt.chars || opt.longest_line);
-    let lines_longest_only = opt.lines && !(opt.words || opt.chars);
-    let bytes_only = opt.bytes && !(opt.words || opt.chars || opt.lines || opt.longest_line);
-    let chars_only = opt.chars && !(opt.words || opt.lines || opt.longest_line);
+    let strategies = Strategies::new();
+    let strategy = strategies.select(&opt);
+    eprintln!("Strategy: {:?}", strategy);
 
     if opt.input.is_empty() {
-        let count = if lines_only {
-            count_lines(io::stdin())?
-        } else if chars_only {
-            count_codepoints(io::stdin())?
-        } else if opt.chars {
-            count_chars(io::stdin())?
-        } else if lines_longest_only {
-            count_lines_longest(io::stdin())?
-        } else {
-            count_bytes(io::stdin())?
-        };
+        let mut count = Counts::default();
+        strategy.count(&mut io::stdin(), &mut count)?;
         count.print(&opt, &mut out)?;
     }
 
     for path in &opt.input {
-        if bytes_only {
+        if let Impl::BytesOnly = strategy {
             let count = std::fs::metadata(path)
                 .iter()
                 .filter(|md| md.is_file())
@@ -405,24 +525,12 @@ fn main() -> io::Result<()> {
             }
         }
 
-        let count = File::open(path).and_then(|fd| {
-            if lines_only {
-                count_lines(fd)
-            } else if chars_only {
-                count_codepoints(fd)
-            } else if opt.chars {
-                count_chars(fd)
-            } else if lines_longest_only {
-                count_lines_longest(fd)
-            } else {
-                count_bytes(fd)
-            }
-        });
+        let mut count = Counts::new(path.clone());
+        let success = File::open(path).and_then(|fd| strategy.count(fd, &mut count));
 
-        match count {
-            Ok(mut count) => {
+        match success {
+            Ok(()) => {
                 total.add(&count);
-                count.path = Some(path.clone());
                 count.print(&opt, &mut out)?;
             }
             Err(e) => {
