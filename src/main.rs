@@ -114,13 +114,13 @@ impl Default for Impl {
 }
 
 impl Impl {
-    fn count<R: Read>(self, r: R, mut count: &mut Counts) -> io::Result<()> {
+    fn count<R: Read>(self, r: R, mut count: &mut Counts, opt: &Opt) -> io::Result<()> {
         match self {
-            Impl::Lines | Impl::BytesOnly => count_lines(r, &mut count),
-            Impl::LinesMax => count_lines_longest(r, &mut count),
-            Impl::Codepoints => count_codepoints(r, &mut count),
-            Impl::Bytes => count_bytes(r, &mut count),
-            Impl::Unicode => count_chars(r, &mut count),
+            Impl::Lines | Impl::BytesOnly => count_lines(r, &mut count, &opt),
+            Impl::LinesMax => count_lines_longest(r, &mut count, &opt),
+            Impl::Codepoints => count_codepoints(r, &mut count, &opt),
+            Impl::Bytes => count_bytes(r, &mut count, &opt),
+            Impl::Unicode => count_chars(r, &mut count, &opt),
         }
     }
 }
@@ -269,7 +269,7 @@ impl Counts {
 // Fastest approach: just use an optimized bytecount for \n
 //
 // ~2x faster than count_lines_longest
-fn count_lines<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
+fn count_lines<R: Read>(r: R, count: &mut Counts, opt: &Opt) -> io::Result<()> {
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
     loop {
         let len = {
@@ -284,7 +284,7 @@ fn count_lines<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
         reader.consume(len);
 
         if sig::check_signal() {
-            eprintln!("{:?}", count);
+            let _ = count.print(&opt, &mut io::stderr());
         }
     }
 
@@ -295,7 +295,7 @@ fn count_lines<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
 // Use memchr to find newlines
 //
 // ~9x faster than count_bytes
-fn count_lines_longest<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
+fn count_lines_longest<R: Read>(r: R, count: &mut Counts, opt: &Opt) -> io::Result<()> {
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
 
     let mut line_len = 0_u64;
@@ -329,7 +329,7 @@ fn count_lines_longest<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
         reader.consume(len);
 
         if sig::check_signal() {
-            eprintln!("{:?}", count);
+            let _ = count.print(&opt, &mut io::stderr());
         }
     }
 
@@ -339,7 +339,7 @@ fn count_lines_longest<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
 // Count everything, but only using bytes
 //
 // 1.8x faster than count_chars
-fn count_bytes<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
+fn count_bytes<R: Read>(r: R, count: &mut Counts, opt: &Opt) -> io::Result<()> {
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
 
     let mut line_len = 0_u64;
@@ -381,7 +381,7 @@ fn count_bytes<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
         reader.consume(len);
 
         if sig::check_signal() {
-            eprintln!("{:?}", count);
+            let _ = count.print(&opt, &mut io::stderr());
         }
     }
 
@@ -389,7 +389,7 @@ fn count_bytes<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
 }
 
 // Count UTF-8 codepoints
-fn count_codepoints<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
+fn count_codepoints<R: Read>(r: R, count: &mut Counts, opt: &Opt) -> io::Result<()> {
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
 
     let mut last_chars = 0;
@@ -427,7 +427,7 @@ fn count_codepoints<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
         reader.consume(len);
 
         if sig::check_signal() {
-            eprintln!("{:?}", count);
+            let _ = count.print(&opt, &mut io::stderr());
         }
     }
 
@@ -435,7 +435,7 @@ fn count_codepoints<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
 }
 
 // Slow path: UTF-8 processing and additional copying on top.
-fn count_chars<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
+fn count_chars<R: Read>(r: R, count: &mut Counts, opt: &Opt) -> io::Result<()> {
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
 
     let mut line_len = 0_u64;
@@ -470,7 +470,7 @@ fn count_chars<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
         buf.clear();
 
         if sig::check_signal() {
-            println!("{:?}", count);
+            let _ = count.print(&opt, &mut io::stderr());
         }
     }
 
@@ -501,7 +501,7 @@ fn main() -> io::Result<()> {
 
     if opt.input.is_empty() {
         let mut count = Counts::default();
-        strategy.count(&mut io::stdin(), &mut count)?;
+        strategy.count(&mut io::stdin(), &mut count, &opt)?;
         count.print(&opt, &mut out)?;
     }
 
@@ -525,7 +525,7 @@ fn main() -> io::Result<()> {
         }
 
         let mut count = Counts::new(path.clone());
-        let success = File::open(path).and_then(|fd| strategy.count(fd, &mut count));
+        let success = File::open(path).and_then(|fd| strategy.count(fd, &mut count, &opt));
 
         match success {
             Ok(()) => {
