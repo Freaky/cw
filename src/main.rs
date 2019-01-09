@@ -150,61 +150,56 @@ struct Strategies(Vec<Strategy>);
 
 impl Strategies {
     fn new() -> Self {
-        let mut strategies: Vec<Strategy> = vec![];
-
-        strategies.push(Strategy {
-            id: Impl::BytesOnly,
-            rank: 0,
-            bytes: true,
-            ..Strategy::default()
-        });
-
-        strategies.push(Strategy {
-            id: Impl::Lines,
-            rank: 1,
-            bytes: true,
-            lines: true,
-            ..Strategy::default()
-        });
-
-        strategies.push(Strategy {
-            id: Impl::LinesMax,
-            rank: 3,
-            bytes: true,
-            lines: true,
-            longest_line: true,
-            ..Strategy::default()
-        });
-
-        strategies.push(Strategy {
-            id: Impl::Codepoints,
-            rank: 6,
-            chars: true,
-            bytes: true,
-            lines: true,
-            longest_line: true,
-            ..Strategy::default()
-        });
-
-        strategies.push(Strategy {
-            id: Impl::Bytes,
-            rank: 100,
-            words: true,
-            bytes: true,
-            lines: true,
-            longest_line: true,
-            ..Strategy::default()
-        });
-
-        strategies.push(Strategy {
-            id: Impl::Unicode,
-            rank: 1000,
-            words: true,
-            bytes: true,
-            chars: true,
-            lines: true,
-            longest_line: true,
-        });
+        let strategies: Vec<Strategy> = vec![
+            Strategy {
+                id: Impl::BytesOnly,
+                rank: 0,
+                bytes: true,
+                ..Strategy::default()
+            },
+            Strategy {
+                id: Impl::Lines,
+                rank: 1,
+                bytes: true,
+                lines: true,
+                ..Strategy::default()
+            },
+            Strategy {
+                id: Impl::LinesMax,
+                rank: 3,
+                bytes: true,
+                lines: true,
+                longest_line: true,
+                ..Strategy::default()
+            },
+            Strategy {
+                id: Impl::Codepoints,
+                rank: 6,
+                chars: true,
+                bytes: true,
+                lines: true,
+                longest_line: true,
+                ..Strategy::default()
+            },
+            Strategy {
+                id: Impl::Bytes,
+                rank: 100,
+                words: true,
+                bytes: true,
+                lines: true,
+                longest_line: true,
+                ..Strategy::default()
+            },
+            Strategy {
+                id: Impl::Unicode,
+                rank: 1000,
+                words: true,
+                bytes: true,
+                chars: true,
+                lines: true,
+                longest_line: true,
+            }
+        ];
 
         Strategies(strategies)
     }
