@@ -409,7 +409,7 @@ fn count_codepoints<R: Read>(r: R, count: &mut Counts) -> io::Result<()> {
                     count.chars += 1;
 
                     if *b == b'\n' {
-                        let line_len = count.chars - last_chars;
+                        let line_len = (count.chars - last_chars) - 1;
                         last_chars = count.chars;
 
                         if count.longest_line < line_len {
