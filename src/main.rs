@@ -1,10 +1,10 @@
-use std::io::Write;
 use memchr::memchr_iter;
 use std::fs::File;
 use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Read;
+use std::io::Write;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -104,7 +104,7 @@ enum Impl {
     Codepoints, // -m, -lm, -lLm (custom UTF-8 strlen)
     BytesOnly,  // -c (fs stat or just counting read length)
     Bytes,      // no args, -w, -lw, -lwc (bytewise)
-    Unicode     // -mw (String + charwise)
+    Unicode,    // -mw (String + charwise)
 }
 
 impl Default for Impl {
@@ -120,7 +120,7 @@ impl Impl {
             Impl::LinesMax => count_lines_longest(r, &mut count),
             Impl::Codepoints => count_codepoints(r, &mut count),
             Impl::Bytes => count_bytes(r, &mut count),
-            Impl::Unicode => count_chars(r, &mut count)
+            Impl::Unicode => count_chars(r, &mut count),
         }
     }
 }
@@ -138,11 +138,11 @@ struct Strategy {
 
 impl Strategy {
     fn is_usable(&self, opt: &Opt) -> bool {
-        (!opt.lines || self.lines) &&
-        (!opt.bytes || self.bytes) &&
-        (!opt.chars || self.chars) &&
-        (!opt.words || (self.words && self.chars == opt.chars)) &&
-        (!opt.longest_line || (self.longest_line && self.chars == opt.chars))
+        (!opt.lines || self.lines)
+            && (!opt.bytes || self.bytes)
+            && (!opt.chars || self.chars)
+            && (!opt.words || (self.words && self.chars == opt.chars))
+            && (!opt.longest_line || (self.longest_line && self.chars == opt.chars))
     }
 }
 
@@ -213,7 +213,7 @@ impl Strategies {
         self.0
             .iter()
             .filter(|s| s.is_usable(&opt))
-            .min_by(|a,b| a.rank.cmp(&b.rank))
+            .min_by(|a, b| a.rank.cmp(&b.rank))
             .map(|s| s.id)
             .expect("[BUG] Unable to find a suitable implementation")
     }
