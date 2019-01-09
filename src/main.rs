@@ -498,7 +498,6 @@ fn main() -> io::Result<()> {
 
     let strategies = Strategies::new();
     let strategy = strategies.select(&opt);
-    eprintln!("Strategy: {:?}", strategy);
 
     if opt.input.is_empty() {
         let mut count = Counts::default();
