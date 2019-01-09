@@ -1,12 +1,12 @@
 # cw - Count Words
 
-A `wc` clone in Rust.
+A fast `wc` clone in Rust.
 
 ## Synopsis
 
 ```
 -% cw --help
-cw 0.2.0
+cw 0.3.0
 Thomas Hurst <tom@hur.st>
 Count Words - word, line, character and byte count
 
@@ -175,12 +175,11 @@ it count anything else.
 ## Future
 
  * Test suite.
- * Refactor to reduce the code sprawl.
- * Improve `SIGINFO` support.
  * Factor internals out into a library. (#1)
  * Improve multibyte support.
  * Possibly implement locale.
  * Replace clap/structopt with something lighter.
+
 
 ## See Also
 
