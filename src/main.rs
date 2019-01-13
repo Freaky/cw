@@ -99,28 +99,31 @@ struct Counts {
 
 #[derive(Debug, Clone, Copy)]
 enum Impl {
-    Lines,      // -l, -lc (bytecount)
-    LinesMax,   // -lL, -lLc (memchr)
-    Codepoints, // -m, -lm, -lLm (custom UTF-8 strlen)
-    BytesOnly,  // -c (fs stat or just counting read length)
-    Bytes,      // no args, -w, -lw, -lwc (bytewise)
-    Unicode,    // -mw (String + charwise)
+    BytesOnly,
+    LinesOnly,
+    CharsOnly,
+    LinesLongest,
+    WordsLinesLongest,
+    CharsLinesLongest,
+    CharsWordsLinesLongest
 }
 
 impl Default for Impl {
     fn default() -> Self {
-        Impl::Bytes
+        Impl::BytesOnly
     }
 }
 
 impl Impl {
     fn count<R: Read>(self, r: R, mut count: &mut Counts, opt: &Opt) -> io::Result<()> {
         match self {
-            Impl::Lines | Impl::BytesOnly => count_lines(r, &mut count, &opt),
-            Impl::LinesMax => count_lines_longest(r, &mut count, &opt),
-            Impl::Codepoints => count_codepoints(r, &mut count, &opt),
-            Impl::Bytes => count_bytes(r, &mut count, &opt),
-            Impl::Unicode => count_chars(r, &mut count, &opt),
+            Impl::BytesOnly => count_bytes_only(r, &mut count, &opt),
+            Impl::LinesOnly => count_lines_only(r, &mut count, &opt),
+            Impl::CharsOnly => count_chars_only(r, &mut count, &opt),
+            Impl::LinesLongest => count_lines_longest(r, &mut count, &opt),
+            Impl::WordsLinesLongest => count_words_lines_longest(r, &mut count, &opt),
+            Impl::CharsLinesLongest => count_chars_lines_longest(r, &mut count, &opt),
+            Impl::CharsWordsLinesLongest => count_chars_words_lines_longest(r, &mut count, &opt),
         }
     }
 }
@@ -158,32 +161,30 @@ impl Strategies {
                 ..Strategy::default()
             },
             Strategy {
-                id: Impl::Lines,
+                id: Impl::LinesOnly,
                 rank: 1,
                 bytes: true,
                 lines: true,
                 ..Strategy::default()
             },
             Strategy {
-                id: Impl::LinesMax,
-                rank: 3,
-                bytes: true,
-                lines: true,
-                longest_line: true,
-                ..Strategy::default()
-            },
-            Strategy {
-                id: Impl::Codepoints,
-                rank: 6,
+                id: Impl::CharsOnly,
+                rank: 1,
                 chars: true,
                 bytes: true,
+                ..Strategy::default()
+            },
+            Strategy {
+                id: Impl::LinesLongest,
+                rank: 30,
+                bytes: true,
                 lines: true,
                 longest_line: true,
                 ..Strategy::default()
             },
             Strategy {
-                id: Impl::Bytes,
-                rank: 100,
+                id: Impl::WordsLinesLongest,
+                rank: 150,
                 words: true,
                 bytes: true,
                 lines: true,
@@ -191,8 +192,17 @@ impl Strategies {
                 ..Strategy::default()
             },
             Strategy {
-                id: Impl::Unicode,
-                rank: 1000,
+                id: Impl::CharsLinesLongest,
+                rank: 120,
+                bytes: true,
+                chars: true,
+                lines: true,
+                longest_line: true,
+                ..Strategy::default()
+            },
+            Strategy {
+                id: Impl::CharsWordsLinesLongest,
+                rank: 400,
                 words: true,
                 bytes: true,
                 chars: true,
@@ -260,177 +270,129 @@ impl Counts {
     }
 }
 
-// Count lines and bytes
-// Fastest approach: just use an optimized bytecount for \n
-//
-// ~2x faster than count_lines_longest
-fn count_lines<R: Read>(r: R, count: &mut Counts, opt: &Opt) -> io::Result<()> {
-    let mut reader = BufReader::with_capacity(READ_SIZE, r);
-    loop {
-        let len = {
-            let buf = reader.fill_buf()?;
-            if buf.is_empty() {
-                break;
-            }
-            count.lines += bytecount::count(&buf, b'\n') as u64;
-            buf.len()
-        };
-        count.bytes += len as u64;
-        reader.consume(len);
+macro_rules! define_count {
+    ($name:ident, $counter:expr) => {
+        fn $name<R: Read>(r: R, count: &mut Counts, opt: &Opt) -> io::Result<()> {
+            let mut reader = BufReader::with_capacity(READ_SIZE, r);
+            #[allow(unused_mut)]
+            let mut counter = $counter();
 
-        if sig::check_signal() {
-            let _ = count.print(&opt, &mut io::stderr());
+            loop {
+                let len = {
+                    let buf = reader.fill_buf()?;
+                    if buf.is_empty() {
+                        break;
+                    }
+                    counter(&buf, count);
+
+                    buf.len()
+                };
+                count.bytes += len as u64;
+                reader.consume(len);
+
+                if sig::check_signal() {
+                    let _ = count.print(&opt, &mut io::stderr());
+                }
+            }
+
+            Ok(())
         }
     }
-
-    Ok(())
 }
 
-// Count lines, line length, and bytes
-// Use memchr to find newlines
-//
-// ~9x faster than count_bytes
-fn count_lines_longest<R: Read>(r: R, count: &mut Counts, opt: &Opt) -> io::Result<()> {
-    let mut reader = BufReader::with_capacity(READ_SIZE, r);
+// Null counting: just let the macro count read() bytes
+define_count!(count_bytes_only, || |_buf: &[u8], _count: &mut Counts|
+    { /* ... */ });
 
+// Fast path for -l
+define_count!(count_lines_only, || |buf: &[u8], count: &mut Counts|
+    { count.lines += bytecount::count(&buf, b'\n') as u64; });
+
+// Fast path for -m
+define_count!(count_chars_only, || |buf: &[u8], count: &mut Counts|
+    { count.chars += bytecount::num_chars(&buf) as u64; });
+
+// Fast path for -lL
+define_count!(count_lines_longest, || {
     let mut line_len = 0_u64;
 
-    loop {
-        let len = {
-            let buf = reader.fill_buf()?;
-            if buf.is_empty() {
-                break;
+    move |buf: &[u8], count: &mut Counts| {
+        let mut last_pos = 0;
+        for pos in memchr_iter(b'\n', buf) {
+            line_len += ((pos - last_pos as usize) - 1) as u64;
+
+            if count.longest_line < line_len {
+                count.longest_line = line_len;
             }
 
-            let mut last_pos = 0;
-            for pos in memchr_iter(b'\n', buf) {
-                line_len += ((pos - last_pos as usize) - 1) as u64;
+            line_len = 0;
 
-                if count.longest_line < line_len {
-                    count.longest_line = line_len;
-                }
-
-                line_len = 0;
-
-                count.lines += 1;
-                last_pos = pos as u64;
-            }
-
-            line_len = (buf.len() - last_pos as usize) as u64;
-
-            buf.len()
-        };
-        count.bytes += len as u64;
-        reader.consume(len);
-
-        if sig::check_signal() {
-            let _ = count.print(&opt, &mut io::stderr());
+            count.lines += 1;
+            last_pos = pos as u64;
         }
+
+        line_len = (buf.len() - last_pos as usize) as u64;
     }
+});
 
-    Ok(())
-}
-
-// Count everything, but only using bytes
-//
-// 1.8x faster than count_chars
-fn count_bytes<R: Read>(r: R, count: &mut Counts, opt: &Opt) -> io::Result<()> {
-    let mut reader = BufReader::with_capacity(READ_SIZE, r);
-
+// Simple ASCII wordcount
+define_count!(count_words_lines_longest, || {
     let mut line_len = 0_u64;
     let mut in_word = false;
 
-    loop {
-        let len = {
-            let buf = reader.fill_buf()?;
-            if buf.is_empty() {
-                break;
+    move |buf: &[u8], count: &mut Counts| {
+        for byte in buf {
+            if (*byte as char).is_ascii_whitespace() {
+                in_word = false;
+            } else {
+                if !in_word {
+                    count.words += 1;
+                }
+                in_word = true;
             }
 
-            count.bytes += buf.len() as u64;
-
-            for byte in buf {
-                if (*byte as char).is_ascii_whitespace() {
-                    in_word = false;
-                } else {
-                    if !in_word {
-                        count.words += 1;
-                    }
-                    in_word = true;
+            if *byte == b'\n' {
+                if count.longest_line < line_len {
+                    count.longest_line = line_len
                 }
 
-                if *byte == b'\n' {
+                line_len = 0;
+                count.lines += 1;
+            } else {
+                line_len += 1;
+            }
+        }
+    }
+});
+
+// Fast path for -ml and -mlL
+define_count!(count_chars_lines_longest, || {
+    let mut last_chars = 0;
+
+    move |buf: &[u8], count: &mut Counts| {
+        // http://canonical.org/~kragen/strlen-utf8
+        //
+        // Counting bytes that don't start 0b10
+        for b in buf {
+            if (b & 0xc0) != 0x80 {
+                count.chars += 1;
+
+                if *b == b'\n' {
+                    let line_len = (count.chars - last_chars) - 1;
+                    last_chars = count.chars;
+
                     if count.longest_line < line_len {
                         count.longest_line = line_len
                     }
-
-                    line_len = 0;
                     count.lines += 1;
-                } else {
-                    line_len += 1;
                 }
             }
-            buf.len()
-        };
-
-        reader.consume(len);
-
-        if sig::check_signal() {
-            let _ = count.print(&opt, &mut io::stderr());
         }
     }
+});
 
-    Ok(())
-}
-
-// Count UTF-8 codepoints
-fn count_codepoints<R: Read>(r: R, count: &mut Counts, opt: &Opt) -> io::Result<()> {
-    let mut reader = BufReader::with_capacity(READ_SIZE, r);
-
-    let mut last_chars = 0;
-
-    loop {
-        let len = {
-            let buf = reader.fill_buf()?;
-            if buf.is_empty() {
-                break;
-            }
-
-            // http://canonical.org/~kragen/strlen-utf8
-            //
-            // Counting bytes that don't start 0b10
-            for b in buf {
-                if (b & 0xc0) != 0x80 {
-                    count.chars += 1;
-
-                    if *b == b'\n' {
-                        let line_len = (count.chars - last_chars) - 1;
-                        last_chars = count.chars;
-
-                        if count.longest_line < line_len {
-                            count.longest_line = line_len
-                        }
-                        count.lines += 1;
-                    }
-                }
-            }
-
-            buf.len()
-        };
-        count.bytes += len as u64;
-
-        reader.consume(len);
-
-        if sig::check_signal() {
-            let _ = count.print(&opt, &mut io::stderr());
-        }
-    }
-
-    Ok(())
-}
-
-// Slow path: UTF-8 processing and additional copying on top.
-fn count_chars<R: Read>(r: R, count: &mut Counts, opt: &Opt) -> io::Result<()> {
+// Slow path for -mw: UTF-8 processing and additional copying on top.
+fn count_chars_words_lines_longest<R: Read>(r: R, count: &mut Counts, opt: &Opt) -> io::Result<()> {
     let mut reader = BufReader::with_capacity(READ_SIZE, r);
 
     let mut line_len = 0_u64;

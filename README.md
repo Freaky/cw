@@ -6,7 +6,7 @@ A fast `wc` clone in Rust.
 
 ```
 -% cw --help
-cw 0.3.0
+cw 0.4.0
 Thomas Hurst <tom@hur.st>
 Count Words - word, line, character and byte count
 
@@ -31,7 +31,7 @@ ARGS:
 
 ## Performance
 
-Line counts are optimized using the `bytecount` crate:
+Line counts are optimized using the [`bytecount`][bytecount] crate:
 
 ```
 Benchmark #1: wc -l Dickens_Charles_Pickwick_Papers.xml
@@ -52,7 +52,7 @@ Summary
     4.17 ± 0.05 times faster than 'gwc -l Dickens_Charles_Pickwick_Papers.xml'
 ```
 
-Line counts with line length are optimized using the `memchr` crate:
+Line counts with line length are optimized using the [`memchr`][memchr] crate:
 
 ```
 Benchmark #1: wc -lL Dickens_Charles_Pickwick_Papers.xml
@@ -94,7 +94,50 @@ Summary
     1.90 ± 0.00 times faster than 'gwc Dickens_Charles_Pickwick_Papers.xml'
 ```
 
-`-m` enables UTF-8 processing, with a fast-path for character and line length:
+`-m` enables UTF-8 processing, with a fast-path for just character length, again
+using `bytecount`:
+
+```
+Benchmark #1: wc -m Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):      8.965 s ±  0.006 s    [User: 8.878 s, System: 0.086 s]
+  Range (min … max):    8.962 s …  8.981 s
+
+  Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet PC without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
+
+Benchmark #2: gwc -m Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):      3.849 s ±  0.002 s    [User: 3.706 s, System: 0.143 s]
+  Range (min … max):    3.846 s …  3.853 s
+
+Benchmark #3: cw -m Dickens_Charles_Pickwick_Papers.xml
+  Time (mean ± σ):     127.4 ms ±   1.6 ms    [User: 26.8 ms, System: 100.5 ms]
+  Range (min … max):   124.0 ms … 130.5 ms
+
+Summary
+  'cw -m Dickens_Charles_Pickwick_Papers.xml' ran
+   30.21 ± 0.39 times faster than 'gwc -m Dickens_Charles_Pickwick_Papers.xml'
+   70.36 ± 0.91 times faster than 'wc -m Dickens_Charles_Pickwick_Papers.xml'
+```
+
+```
+Benchmark #1: wc -m test-utf-8.html
+  Time (mean ± σ):      1.180 s ±  0.000 s    [User: 1.167 s, System: 0.013 s]
+  Range (min … max):    1.180 s …  1.181 s
+
+Benchmark #2: gwc -m test-utf-8.html
+  Time (mean ± σ):      1.730 s ±  0.002 s    [User: 1.712 s, System: 0.018 s]
+  Range (min … max):    1.729 s …  1.736 s
+
+Benchmark #3: cw -m test-utf-8.html
+  Time (mean ± σ):      13.9 ms ±   0.2 ms    [User: 2.7 ms, System: 11.5 ms]
+  Range (min … max):    13.5 ms …  14.7 ms
+
+Summary
+  'cw -m test-utf-8.html' ran
+   84.74 ± 1.12 times faster than 'wc -m test-utf-8.html'
+  124.21 ± 1.64 times faster than 'gwc -m test-utf-8.html'
+```
+
+And another path for character and line length:
 
 ```
 Benchmark #1: wc -mlL Dickens_Charles_Pickwick_Papers.xml
@@ -168,8 +211,8 @@ For best results build with:
 cargo build --release --features runtime-dispatch-simd
 ```
 
-This enables SIMD optimizations for line counting.  It has no effect if you have
-it count anything else.
+This enables SIMD optimizations for line and character counting.  It has no
+effect if you count anything else.
 
 
 ## Future
@@ -205,6 +248,8 @@ A little library that only does plain newline counting, along with a binary
 called `lc`.  Version 0.2 will use the same algorithm as `cw`.
 
 
+[bytecount]: https://crates.io/crates/bytecount
+[memchr]: https://crates.io/crates/memchr
 [uwc]: https://crates.io/crates/uwc
 [rwc]: https://crates.io/crates/rwc
 [linecount]: https://crates.io/crates/linecount
