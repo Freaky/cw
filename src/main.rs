@@ -344,21 +344,22 @@ define_count!(count_words_lines_longest, || {
         for b in buf {
             if (*b as char).is_ascii_whitespace() {
                 in_word = false;
+
+                if *b == b'\n' {
+                    if count.longest_line < line_len {
+                        count.longest_line = line_len
+                    }
+
+                    line_len = 0;
+                    count.lines += 1;
+                } else {
+                    line_len += 1;
+                }
             } else {
                 if !in_word {
                     count.words += 1;
                 }
                 in_word = true;
-            }
-
-            if *b == b'\n' {
-                if count.longest_line < line_len {
-                    count.longest_line = line_len
-                }
-
-                line_len = 0;
-                count.lines += 1;
-            } else {
                 line_len += 1;
             }
         }
