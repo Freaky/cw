@@ -34,19 +34,6 @@ ARGS:
 Line counts are optimized using the [`bytecount`][bytecount] crate:
 
 ```
-Benchmark #1: wc -l Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):     439.7 ms ±   2.0 ms    [User: 354.9 ms, System: 84.5 ms]
-  Range (min … max):   435.3 ms … 441.4 ms
-
-Benchmark #2: gwc -l Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):     533.0 ms ±   1.7 ms    [User: 388.8 ms, System: 144.0 ms]
-  Range (min … max):   530.9 ms … 535.1 ms
-
-Benchmark #3: cw -l Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):     127.9 ms ±   1.5 ms    [User: 24.1 ms, System: 103.7 ms]
-  Range (min … max):   125.1 ms … 131.3 ms
-
-Summary
   'cw -l Dickens_Charles_Pickwick_Papers.xml' ran
     3.44 ± 0.04 times faster than 'wc -l Dickens_Charles_Pickwick_Papers.xml'
     4.17 ± 0.05 times faster than 'gwc -l Dickens_Charles_Pickwick_Papers.xml'
@@ -55,19 +42,6 @@ Summary
 Line counts with line length are optimized using the [`memchr`][memchr] crate:
 
 ```
-Benchmark #1: wc -lL Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):     441.6 ms ±   1.8 ms    [User: 354.7 ms, System: 86.5 ms]
-  Range (min … max):   438.5 ms … 443.8 ms
-
-Benchmark #2: gwc -lL Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):      3.851 s ±  0.005 s    [User: 3.710 s, System: 0.141 s]
-  Range (min … max):    3.847 s …  3.864 s
-
-Benchmark #3: cw -lL Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):     255.6 ms ±   1.1 ms    [User: 154.6 ms, System: 100.9 ms]
-  Range (min … max):   253.3 ms … 256.9 ms
-
-Summary
   'cw -lL Dickens_Charles_Pickwick_Papers.xml' ran
     1.73 ± 0.01 times faster than 'wc -lL Dickens_Charles_Pickwick_Papers.xml'
    15.07 ± 0.07 times faster than 'gwc -lL Dickens_Charles_Pickwick_Papers.xml'
@@ -76,19 +50,6 @@ Summary
 Note without `-m` cw only operates on bytes, and it never cares about your locale.
 
 ```
-Benchmark #1: wc Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):      2.708 s ±  0.002 s    [User: 2.612 s, System: 0.095 s]
-  Range (min … max):    2.706 s …  2.712 s
-
-Benchmark #2: gwc Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):      3.851 s ±  0.003 s    [User: 3.714 s, System: 0.136 s]
-  Range (min … max):    3.847 s …  3.856 s
-
-Benchmark #3: cw Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):      2.026 s ±  0.001 s    [User: 1.939 s, System: 0.087 s]
-  Range (min … max):    2.024 s …  2.028 s
-
-Summary
   'cw Dickens_Charles_Pickwick_Papers.xml' ran
     1.34 ± 0.00 times faster than 'wc Dickens_Charles_Pickwick_Papers.xml'
     1.90 ± 0.00 times faster than 'gwc Dickens_Charles_Pickwick_Papers.xml'
@@ -98,40 +59,12 @@ Summary
 using `bytecount`:
 
 ```
-Benchmark #1: wc -m Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):      8.965 s ±  0.006 s    [User: 8.878 s, System: 0.086 s]
-  Range (min … max):    8.962 s …  8.981 s
-
-  Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet PC without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
-
-Benchmark #2: gwc -m Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):      3.849 s ±  0.002 s    [User: 3.706 s, System: 0.143 s]
-  Range (min … max):    3.846 s …  3.853 s
-
-Benchmark #3: cw -m Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):     127.4 ms ±   1.6 ms    [User: 26.8 ms, System: 100.5 ms]
-  Range (min … max):   124.0 ms … 130.5 ms
-
-Summary
   'cw -m Dickens_Charles_Pickwick_Papers.xml' ran
    30.21 ± 0.39 times faster than 'gwc -m Dickens_Charles_Pickwick_Papers.xml'
    70.36 ± 0.91 times faster than 'wc -m Dickens_Charles_Pickwick_Papers.xml'
 ```
 
 ```
-Benchmark #1: wc -m test-utf-8.html
-  Time (mean ± σ):      1.180 s ±  0.000 s    [User: 1.167 s, System: 0.013 s]
-  Range (min … max):    1.180 s …  1.181 s
-
-Benchmark #2: gwc -m test-utf-8.html
-  Time (mean ± σ):      1.730 s ±  0.002 s    [User: 1.712 s, System: 0.018 s]
-  Range (min … max):    1.729 s …  1.736 s
-
-Benchmark #3: cw -m test-utf-8.html
-  Time (mean ± σ):      13.9 ms ±   0.2 ms    [User: 2.7 ms, System: 11.5 ms]
-  Range (min … max):    13.5 ms …  14.7 ms
-
-Summary
   'cw -m test-utf-8.html' ran
    84.74 ± 1.12 times faster than 'wc -m test-utf-8.html'
   124.21 ± 1.64 times faster than 'gwc -m test-utf-8.html'
@@ -140,40 +73,12 @@ Summary
 And another path for character and line length:
 
 ```
-Benchmark #1: wc -mlL Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):      8.968 s ±  0.007 s    [User: 8.885 s, System: 0.082 s]
-  Range (min … max):    8.961 s …  8.982 s
-
-Benchmark #2: gwc -mlL Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):      3.847 s ±  0.006 s    [User: 3.696 s, System: 0.151 s]
-  Range (min … max):    3.842 s …  3.859 s
-
-Benchmark #3: cw -mlL Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):      1.073 s ±  0.001 s    [User: 971.8 ms, System: 100.6 ms]
-  Range (min … max):    1.071 s …  1.075 s
-
-Summary
   'cw -mlL Dickens_Charles_Pickwick_Papers.xml' ran
     3.59 ± 0.01 times faster than 'gwc -mlL Dickens_Charles_Pickwick_Papers.xml'
     8.36 ± 0.01 times faster than 'wc -mlL Dickens_Charles_Pickwick_Papers.xml'
 ```
 
 ```
-Benchmark #1: wc -mlL test-utf-8.html
-  Time (mean ± σ):      1.180 s ±  0.000 s    [User: 1.176 s, System: 0.010 s]
-  Range (min … max):    1.180 s …  1.181 s
-
-Benchmark #2: gwc -mlL test-utf-8.html
-  Time (mean ± σ):      2.374 s ±  0.001 s    [User: 2.354 s, System: 0.017 s]
-  Range (min … max):    2.372 s …  2.377 s
-
-Benchmark #3: cw -mlL test-utf-8.html
-  Time (mean ± σ):     117.4 ms ±   0.6 ms    [User: 105.9 ms, System: 10.1 ms]
-  Range (min … max):   117.0 ms … 120.3 ms
-
-  Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet PC without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
-
-Summary
   'cw -mlL test-utf-8.html' ran
    10.05 ± 0.05 times faster than 'wc -mlL test-utf-8.html'
    20.22 ± 0.11 times faster than 'gwc -mlL test-utf-8.html'
@@ -182,21 +87,6 @@ Summary
 And a slow path for everything else:
 
 ```
-Benchmark #1: wc -mLlw Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):      8.972 s ±  0.019 s    [User: 8.875 s, System: 0.096 s]
-  Range (min … max):    8.958 s …  9.013 s
-
-  Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet PC without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
-
-Benchmark #2: gwc -mLlw Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):      3.852 s ±  0.008 s    [User: 3.700 s, System: 0.151 s]
-  Range (min … max):    3.846 s …  3.867 s
-
-Benchmark #3: cw -mLlw Dickens_Charles_Pickwick_Papers.xml
-  Time (mean ± σ):      3.721 s ±  0.003 s    [User: 3.598 s, System: 0.123 s]
-  Range (min … max):    3.715 s …  3.726 s
-
-Summary
   'cw -mLlw Dickens_Charles_Pickwick_Papers.xml' ran
     1.04 ± 0.00 times faster than 'gwc -mLlw Dickens_Charles_Pickwick_Papers.xml'
     2.41 ± 0.01 times faster than 'wc -mLlw Dickens_Charles_Pickwick_Papers.xml'
