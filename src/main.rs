@@ -407,21 +407,22 @@ fn count_chars_words_lines_longest<R: Read>(r: R, count: &mut Counts, opt: &Opt)
             count.chars += 1;
             if c.is_whitespace() {
                 in_word = false;
+
+                if c == '\n' {
+                    if count.longest_line < line_len {
+                        count.longest_line = line_len
+                    }
+
+                    line_len = 0;
+                    count.lines += 1;
+                } else {
+                    line_len += 1;
+                }
             } else {
                 if !in_word {
                     count.words += 1;
                 }
                 in_word = true;
-            }
-
-            if c == '\n' {
-                if count.longest_line < line_len {
-                    count.longest_line = line_len
-                }
-
-                line_len = 0;
-                count.lines += 1;
-            } else {
                 line_len += 1;
             }
         }
