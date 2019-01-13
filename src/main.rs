@@ -341,8 +341,8 @@ define_count!(count_words_lines_longest, || {
     let mut in_word = false;
 
     move |buf: &[u8], count: &mut Counts| {
-        for byte in buf {
-            if (*byte as char).is_ascii_whitespace() {
+        for b in buf {
+            if (*b as char).is_ascii_whitespace() {
                 in_word = false;
             } else {
                 if !in_word {
@@ -351,7 +351,7 @@ define_count!(count_words_lines_longest, || {
                 in_word = true;
             }
 
-            if *byte == b'\n' {
+            if *b == b'\n' {
                 if count.longest_line < line_len {
                     count.longest_line = line_len
                 }
