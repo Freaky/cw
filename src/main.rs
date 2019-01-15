@@ -7,6 +7,7 @@ use std::io::Read;
 use std::io::Write;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
 
 const READ_SIZE: usize = 1024 * 32;
 
@@ -21,9 +22,9 @@ const READ_SIZE: usize = 1024 * 32;
 ))]
 mod sig {
     use libc::{c_int, c_void, sighandler_t, signal, SIGINFO};
-    use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
     use std::thread_local;
     use std::cell::RefCell;
+    use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
 
     static SIGINFO_RECEIVED: AtomicUsize = ATOMIC_USIZE_INIT;
     thread_local! {
@@ -31,7 +32,7 @@ mod sig {
     }
 
     extern "C" fn trigger_signal(_: c_int) {
-        SIGINFO_RECEIVED.fetch_add(1, Ordering::Release);
+        SIGINFO_RECEIVED.fetch_add(1, std::sync::atomic::Ordering::Release);
     }
 
     fn get_handler() -> sighandler_t {
@@ -40,7 +41,7 @@ mod sig {
 
     pub fn check_signal() -> bool {
         SIGINFO_GEN.with(|gen| {
-            let current = SIGINFO_RECEIVED.load(Ordering::Acquire);
+            let current = SIGINFO_RECEIVED.load(std::sync::atomic::Ordering::Acquire);
             let received = current != *gen.borrow();
             *gen.borrow_mut() = current;
             return received;
@@ -455,7 +456,6 @@ fn count_chars_words_lines_longest<R: Read>(r: R, count: &mut Counts, opt: &Opt)
 
 use crossbeam_channel;
 use crossbeam_utils::thread;
-use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::collections::BinaryHeap;
 use std::cmp::Ordering;
@@ -479,7 +479,7 @@ fn main() -> io::Result<()> {
     let mut total = Counts::new("total");
     let stdout = io::stdout();
     let mut out = stdout.lock();
-    let mut exit_code = 0;
+    let exit_code = Arc::new(ATOMIC_USIZE_INIT);
 
     sig::hook_signal();
 
@@ -514,6 +514,7 @@ fn main() -> io::Result<()> {
             let thread_result_tx = result_tx.clone();
             let thread_count_idx = count_idx.clone();
             let thread_opt = opt_arc.clone();
+            let thread_exit = exit_code.clone();
 
             scope.spawn(move |_| {
                 let mut i;
@@ -548,7 +549,7 @@ fn main() -> io::Result<()> {
                             thread_result_tx.send(ComputedCount(i, count)).expect("channel");
                         }
                         Err(e) => {
-                            // exit_code = 1;
+                            thread_exit.store(1, std::sync::atomic::Ordering::SeqCst);
                             eprintln!("{}: {}", path.display(), e);
                         }
                     }
@@ -613,5 +614,5 @@ fn main() -> io::Result<()> {
         total.print(&opt, &mut out)?;
     }
 
-    std::process::exit(exit_code);
+    std::process::exit(exit_code.load(std::sync::atomic::Ordering::SeqCst) as i32);
 }
