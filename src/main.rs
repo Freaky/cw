@@ -6,8 +6,8 @@ use std::io::BufReader;
 use std::io::Read;
 use std::io::Write;
 use std::path::PathBuf;
-use structopt::StructOpt;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
+use structopt::StructOpt;
 
 const READ_SIZE: usize = 1024 * 32;
 
@@ -22,9 +22,9 @@ const READ_SIZE: usize = 1024 * 32;
 ))]
 mod sig {
     use libc::{c_int, c_void, sighandler_t, signal, SIGINFO};
-    use std::thread_local;
     use std::cell::RefCell;
     use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
+    use std::thread_local;
 
     static SIGINFO_RECEIVED: AtomicUsize = ATOMIC_USIZE_INIT;
     thread_local! {
@@ -94,7 +94,7 @@ struct Opt {
     #[structopt(short = "m", long = "chars")]
     chars: bool,
     /// Number of counting threads to spawn
-    #[structopt(long = "threads", default_value="1")]
+    #[structopt(long = "threads", default_value = "1")]
     threads: usize, // std::num::NonZeroUsize
     /// Input files
     #[structopt(parse(from_os_str))]
@@ -119,7 +119,7 @@ enum Impl {
     LinesLongest,
     WordsLinesLongest,
     CharsLinesLongest,
-    CharsWordsLinesLongest
+    CharsWordsLinesLongest,
 }
 
 impl Default for Impl {
@@ -222,7 +222,7 @@ impl Strategies {
                 chars: true,
                 lines: true,
                 longest_line: true,
-            }
+            },
         ];
 
         Strategies(strategies)
@@ -313,20 +313,23 @@ macro_rules! define_count {
 
             Ok(())
         }
-    }
+    };
 }
 
 // Null counting: just let the macro count read() bytes
-define_count!(count_bytes_only, || |_buf: &[u8], _count: &mut Counts|
-    { /* ... */ });
+define_count!(count_bytes_only, || |_buf: &[u8], _count: &mut Counts| {
+    /* ... */
+});
 
 // Fast path for -l
-define_count!(count_lines_only, || |buf: &[u8], count: &mut Counts|
-    { count.lines += bytecount::count(&buf, b'\n') as u64; });
+define_count!(count_lines_only, || |buf: &[u8], count: &mut Counts| {
+    count.lines += bytecount::count(&buf, b'\n') as u64;
+});
 
 // Fast path for -m
-define_count!(count_chars_only, || |buf: &[u8], count: &mut Counts|
-    { count.chars += bytecount::num_chars(&buf) as u64; });
+define_count!(count_chars_only, || |buf: &[u8], count: &mut Counts| {
+    count.chars += bytecount::num_chars(&buf) as u64;
+});
 
 // Fast path for -lL
 define_count!(count_lines_longest, || {
@@ -456,23 +459,28 @@ fn count_chars_words_lines_longest<R: Read>(r: R, count: &mut Counts, opt: &Opt)
 
 use crossbeam_channel;
 use crossbeam_utils::thread;
-use std::sync::Arc;
-use std::collections::BinaryHeap;
 use std::cmp::Ordering;
+use std::collections::BinaryHeap;
+use std::sync::Arc;
 
 struct ComputedCount(usize, Counts);
 
 impl PartialEq for ComputedCount {
-    fn eq(&self, o: &Self) -> bool { o.0.eq(&self.0) }
+    fn eq(&self, o: &Self) -> bool {
+        o.0.eq(&self.0)
+    }
 }
 impl Eq for ComputedCount {}
 impl PartialOrd for ComputedCount {
-    fn partial_cmp(&self, o: &Self) -> Option<Ordering> { o.0.partial_cmp(&self.0) }
+    fn partial_cmp(&self, o: &Self) -> Option<Ordering> {
+        o.0.partial_cmp(&self.0)
+    }
 }
 impl Ord for ComputedCount {
-    fn cmp(&self, o: &Self) -> Ordering { o.0.cmp(&self.0) }
+    fn cmp(&self, o: &Self) -> Ordering {
+        o.0.cmp(&self.0)
+    }
 }
-
 
 fn main() -> io::Result<()> {
     let mut opt = Opt::from_args();
@@ -536,17 +544,22 @@ fn main() -> io::Result<()> {
                             .next();
 
                         if let Some(count) = count {
-                            thread_result_tx.send(ComputedCount(i, count)).expect("channel");
+                            thread_result_tx
+                                .send(ComputedCount(i, count))
+                                .expect("channel");
                             continue;
                         }
                     }
 
                     let mut count = Counts::new(path.clone());
-                    let success = File::open(&path).and_then(|fd| strategy.count(fd, &mut count, &thread_opt));
+                    let success = File::open(&path)
+                        .and_then(|fd| strategy.count(fd, &mut count, &thread_opt));
 
                     match success {
                         Ok(()) => {
-                            thread_result_tx.send(ComputedCount(i, count)).expect("channel");
+                            thread_result_tx
+                                .send(ComputedCount(i, count))
+                                .expect("channel");
                         }
                         Err(e) => {
                             thread_exit.store(1, std::sync::atomic::Ordering::SeqCst);
@@ -573,8 +586,8 @@ fn main() -> io::Result<()> {
                 count.print(&opt, &mut out).expect("print");
             }
         }
-
-    }).expect("thread");
+    })
+    .expect("thread");
 
     // for path in &opt.input {
     //     if let Impl::BytesOnly = strategy {
