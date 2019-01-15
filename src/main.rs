@@ -21,12 +21,17 @@ const READ_SIZE: usize = 1024 * 32;
 ))]
 mod sig {
     use libc::{c_int, c_void, sighandler_t, signal, SIGINFO};
-    use std::sync::atomic::{AtomicBool, Ordering, ATOMIC_BOOL_INIT};
+    use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+    use std::thread_local;
+    use std::cell::RefCell;
 
-    static SIGINFO_RECEIVED: AtomicBool = ATOMIC_BOOL_INIT;
+    static SIGINFO_RECEIVED: AtomicUsize = ATOMIC_USIZE_INIT;
+    thread_local! {
+        static SIGINFO_GEN: RefCell<usize> = RefCell::new(0);
+    }
 
     extern "C" fn trigger_signal(_: c_int) {
-        SIGINFO_RECEIVED.store(true, Ordering::Release);
+        SIGINFO_RECEIVED.fetch_add(1, Ordering::Release);
     }
 
     fn get_handler() -> sighandler_t {
@@ -34,7 +39,12 @@ mod sig {
     }
 
     pub fn check_signal() -> bool {
-        SIGINFO_RECEIVED.swap(false, Ordering::AcqRel)
+        SIGINFO_GEN.with(|gen| {
+            let current = SIGINFO_RECEIVED.load(Ordering::Acquire);
+            let received = current != *gen.borrow();
+            *gen.borrow_mut() = current;
+            return received;
+        })
     }
 
     pub fn hook_signal() {
@@ -294,7 +304,9 @@ macro_rules! define_count {
                 reader.consume(len);
 
                 if sig::check_signal() {
-                    let _ = count.print(&opt, &mut io::stderr());
+                    let err = io::stderr();
+                    let mut errl = err.lock();
+                    let _ = count.print(&opt, &mut errl);
                 }
             }
 
@@ -432,7 +444,9 @@ fn count_chars_words_lines_longest<R: Read>(r: R, count: &mut Counts, opt: &Opt)
         buf.clear();
 
         if sig::check_signal() {
-            let _ = count.print(&opt, &mut io::stderr());
+            let err = io::stderr();
+            let mut errl = err.lock();
+            let _ = count.print(&opt, &mut errl);
         }
     }
 
