@@ -95,7 +95,7 @@ struct Opt {
     chars: bool,
     /// Number of counting threads to spawn
     #[structopt(long = "threads", default_value = "1")]
-    threads: usize, // std::num::NonZeroUsize
+    threads: usize,
     /// Input files
     #[structopt(parse(from_os_str))]
     input: Vec<PathBuf>,
@@ -510,7 +510,10 @@ fn main() -> io::Result<()> {
         return count.print(&opt, &mut out);
     }
 
-    let threads = opt.threads;
+    let mut threads = opt.threads;
+    if threads == 0 {
+        threads = 1;
+    }
     let items = opt.input.len();
 
     thread::scope(|scope| {
