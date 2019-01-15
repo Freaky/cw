@@ -61,7 +61,7 @@ mod sig {
     pub fn hook_signal() {}
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Clone)]
 #[structopt(
     name = "cw",
     about = "Count Words - word, line, character and byte count"
@@ -82,6 +82,9 @@ struct Opt {
     /// Count UTF-8 characters instead of bytes
     #[structopt(short = "m", long = "chars")]
     chars: bool,
+    /// Number of counting threads to spawn
+    #[structopt(long = "threads", default_value="1")]
+    threads: usize, // std::num::NonZeroUsize
     /// Input files
     #[structopt(parse(from_os_str))]
     input: Vec<PathBuf>,
@@ -436,6 +439,27 @@ fn count_chars_words_lines_longest<R: Read>(r: R, count: &mut Counts, opt: &Opt)
     Ok(())
 }
 
+use crossbeam_channel;
+use crossbeam_utils::thread;
+use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
+use std::collections::BinaryHeap;
+use std::cmp::Ordering;
+
+struct ComputedCount(usize, Counts);
+
+impl PartialEq for ComputedCount {
+    fn eq(&self, o: &Self) -> bool { o.0.eq(&self.0) }
+}
+impl Eq for ComputedCount {}
+impl PartialOrd for ComputedCount {
+    fn partial_cmp(&self, o: &Self) -> Option<Ordering> { o.0.partial_cmp(&self.0) }
+}
+impl Ord for ComputedCount {
+    fn cmp(&self, o: &Self) -> Ordering { o.0.cmp(&self.0) }
+}
+
+
 fn main() -> io::Result<()> {
     let mut opt = Opt::from_args();
     let mut total = Counts::new("total");
@@ -461,42 +485,115 @@ fn main() -> io::Result<()> {
     if opt.input.is_empty() {
         let mut count = Counts::default();
         strategy.count(&mut io::stdin(), &mut count, &opt)?;
-        count.print(&opt, &mut out)?;
+        return count.print(&opt, &mut out);
     }
 
-    for path in &opt.input {
-        if let Impl::BytesOnly = strategy {
-            let count = std::fs::metadata(path)
-                .iter()
-                .filter(|md| md.is_file())
-                .map(|md| Counts {
-                    bytes: md.len(),
-                    path: Some(path.clone()),
-                    ..Counts::default()
-                })
-                .next();
+    let threads = opt.threads;
+    let items = opt.input.len();
 
-            if let Some(count) = count {
-                total.bytes += count.bytes;
-                count.print(&opt, &mut out)?;
-                continue;
-            }
+    thread::scope(|scope| {
+        let (result_tx, result_rx) = crossbeam_channel::bounded(128);
+        let count_idx = Arc::new(AtomicUsize::new(0));
+        let opt_arc = Arc::new(opt.clone());
+
+        for _ in 0..threads {
+            let thread_result_tx = result_tx.clone();
+            let thread_count_idx = count_idx.clone();
+            let thread_opt = opt_arc.clone();
+
+            scope.spawn(move |_| {
+                let mut i;
+                loop {
+                    i = thread_count_idx.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    if i >= items {
+                        break;
+                    }
+                    let path = &thread_opt.input[i];
+                    if let Impl::BytesOnly = strategy {
+                        let count = std::fs::metadata(path)
+                            .iter()
+                            .filter(|md| md.is_file())
+                            .map(|md| Counts {
+                                bytes: md.len(),
+                                path: Some(path.clone()),
+                                ..Counts::default()
+                            })
+                            .next();
+
+                        if let Some(count) = count {
+                            thread_result_tx.send(ComputedCount(i, count)).expect("channel");
+                            continue;
+                        }
+                    }
+
+                    let mut count = Counts::new(path.clone());
+                    let success = File::open(&path).and_then(|fd| strategy.count(fd, &mut count, &thread_opt));
+
+                    match success {
+                        Ok(()) => {
+                            thread_result_tx.send(ComputedCount(i, count)).expect("channel");
+                        }
+                        Err(e) => {
+                            // exit_code = 1;
+                            eprintln!("{}: {}", path.display(), e);
+                        }
+                    }
+                }
+
+                drop(thread_result_tx);
+            });
         }
+        drop(result_tx);
 
-        let mut count = Counts::new(path.clone());
-        let success = File::open(path).and_then(|fd| strategy.count(fd, &mut count, &opt));
+        let mut buffered = BinaryHeap::new();
+        let mut next = 0;
 
-        match success {
-            Ok(()) => {
+        for item in result_rx {
+            buffered.push(item);
+
+            while buffered.peek().map(|x| x.0) == Some(next) {
+                let ComputedCount(_, count) = buffered.pop().expect("binary heap pop");
+                next += 1;
                 total.add(&count);
-                count.print(&opt, &mut out)?;
-            }
-            Err(e) => {
-                exit_code = 1;
-                eprintln!("{}: {}", path.display(), e);
+                count.print(&opt, &mut out).expect("print");
             }
         }
-    }
+
+    }).expect("thread");
+
+    // for path in &opt.input {
+    //     if let Impl::BytesOnly = strategy {
+    //         let count = std::fs::metadata(path)
+    //             .iter()
+    //             .filter(|md| md.is_file())
+    //             .map(|md| Counts {
+    //                 bytes: md.len(),
+    //                 path: Some(path.clone()),
+    //                 ..Counts::default()
+    //             })
+    //             .next();
+
+    //         if let Some(count) = count {
+    //             total.bytes += count.bytes;
+    //             count.print(&opt, &mut out)?;
+    //             continue;
+    //         }
+    //     }
+
+    //     let mut count = Counts::new(path.clone());
+    //     let success = File::open(path).and_then(|fd| strategy.count(fd, &mut count, &opt));
+
+    //     match success {
+    //         Ok(()) => {
+    //             total.add(&count);
+    //             count.print(&opt, &mut out)?;
+    //         }
+    //         Err(e) => {
+    //             exit_code = 1;
+    //             eprintln!("{}: {}", path.display(), e);
+    //         }
+    //     }
+    // }
 
     if opt.input.len() > 1 {
         total.print(&opt, &mut out)?;
