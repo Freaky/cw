@@ -6,7 +6,7 @@ use std::io::BufReader;
 use std::io::Read;
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
+use std::sync::atomic::AtomicUsize;
 use structopt::StructOpt;
 
 const READ_SIZE: usize = 1024 * 32;
@@ -457,13 +457,18 @@ fn count_chars_words_lines_longest<R: Read>(r: R, count: &mut Counts, opt: &Opt)
     Ok(())
 }
 
+enum CountResult {
+    Ok(Counts),
+    Err(PathBuf, io::Error)
+}
+
 use crossbeam_channel;
 use crossbeam_utils::thread;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::sync::Arc;
 
-struct ComputedCount(usize, Counts);
+struct ComputedCount(usize, CountResult);
 
 impl PartialEq for ComputedCount {
     fn eq(&self, o: &Self) -> bool {
@@ -487,7 +492,7 @@ fn main() -> io::Result<()> {
     let mut total = Counts::new("total");
     let stdout = io::stdout();
     let mut out = stdout.lock();
-    let exit_code = Arc::new(ATOMIC_USIZE_INIT);
+    let mut exit_code = 0;
 
     sig::hook_signal();
 
@@ -525,7 +530,6 @@ fn main() -> io::Result<()> {
             let thread_result_tx = result_tx.clone();
             let thread_count_idx = count_idx.clone();
             let thread_opt = opt_arc.clone();
-            let thread_exit = exit_code.clone();
 
             scope.spawn(move |_| {
                 let mut i;
@@ -548,7 +552,7 @@ fn main() -> io::Result<()> {
 
                         if let Some(count) = count {
                             thread_result_tx
-                                .send(ComputedCount(i, count))
+                                .send(ComputedCount(i, CountResult::Ok(count)))
                                 .expect("channel");
                             continue;
                         }
@@ -561,12 +565,13 @@ fn main() -> io::Result<()> {
                     match success {
                         Ok(()) => {
                             thread_result_tx
-                                .send(ComputedCount(i, count))
+                                .send(ComputedCount(i, CountResult::Ok(count)))
                                 .expect("channel");
                         }
                         Err(e) => {
-                            thread_exit.store(1, std::sync::atomic::Ordering::SeqCst);
-                            eprintln!("{}: {}", path.display(), e);
+                            thread_result_tx
+                                .send(ComputedCount(i, CountResult::Err(path.clone(), e)))
+                                .expect("channel");
                         }
                     }
                 }
@@ -585,8 +590,17 @@ fn main() -> io::Result<()> {
             while buffered.peek().map(|x| x.0) == Some(next) {
                 let ComputedCount(_, count) = buffered.pop().expect("binary heap pop");
                 next += 1;
-                total.add(&count);
-                count.print(&opt, &mut out).expect("print");
+
+                match count {
+                    CountResult::Ok(count) => {
+                        total.add(&count);
+                        count.print(&opt, &mut out).expect("print");
+                    },
+                    CountResult::Err(path, e) => {
+                        exit_code = 1;
+                        eprintln!("{}: {}", path.display(), e);
+                    }
+                }
             }
         }
     })
@@ -630,5 +644,5 @@ fn main() -> io::Result<()> {
         total.print(&opt, &mut out)?;
     }
 
-    std::process::exit(exit_code.load(std::sync::atomic::Ordering::SeqCst) as i32);
+    std::process::exit(exit_code);
 }
