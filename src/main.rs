@@ -459,7 +459,7 @@ fn count_chars_words_lines_longest<R: Read>(r: R, count: &mut Counts, opt: &Opt)
 
 enum CountResult {
     Ok(Counts),
-    Err(PathBuf, io::Error)
+    Err(PathBuf, io::Error),
 }
 
 use crossbeam_channel;
@@ -539,40 +539,32 @@ fn main() -> io::Result<()> {
                         break;
                     }
                     let path = &thread_opt.input[i];
-                    if let Impl::BytesOnly = strategy {
-                        let count = std::fs::metadata(path)
+                    let mut count = Counts::new(&path);
+
+                    let bytes = if let Impl::BytesOnly = strategy {
+                        std::fs::metadata(path)
                             .iter()
                             .filter(|md| md.is_file())
-                            .map(|md| Counts {
-                                bytes: md.len(),
-                                path: Some(path.clone()),
-                                ..Counts::default()
-                            })
-                            .next();
+                            .map(|md| md.len())
+                            .next()
+                    } else {
+                        None
+                    };
 
-                        if let Some(count) = count {
-                            thread_result_tx
-                                .send(ComputedCount(i, CountResult::Ok(count)))
-                                .expect("channel");
-                            continue;
-                        }
-                    }
+                    let success = if let Some(bytes) = bytes {
+                        count.bytes = bytes;
+                        Ok(())
+                    } else {
+                        File::open(&path).and_then(|fd| strategy.count(fd, &mut count, &thread_opt))
+                    };
 
-                    let mut count = Counts::new(path.clone());
-                    let success = File::open(&path)
-                        .and_then(|fd| strategy.count(fd, &mut count, &thread_opt));
+                    let ret = match success {
+                        Ok(()) => CountResult::Ok(count),
+                        Err(e) => CountResult::Err(count.path.take().expect("path"), e),
+                    };
 
-                    match success {
-                        Ok(()) => {
-                            thread_result_tx
-                                .send(ComputedCount(i, CountResult::Ok(count)))
-                                .expect("channel");
-                        }
-                        Err(e) => {
-                            thread_result_tx
-                                .send(ComputedCount(i, CountResult::Err(path.clone(), e)))
-                                .expect("channel");
-                        }
+                    if thread_result_tx.send(ComputedCount(i, ret)).is_err() {
+                        break;
                     }
                 }
 
@@ -595,7 +587,7 @@ fn main() -> io::Result<()> {
                     CountResult::Ok(count) => {
                         total.add(&count);
                         count.print(&opt, &mut out).expect("print");
-                    },
+                    }
                     CountResult::Err(path, e) => {
                         exit_code = 1;
                         eprintln!("{}: {}", path.display(), e);
