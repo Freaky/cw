@@ -515,122 +515,120 @@ fn main() -> io::Result<()> {
         return count.print(&opt, &mut out);
     }
 
-    let mut threads = opt.threads;
-    if threads == 0 {
-        threads = 1;
-    }
     let items = opt.input.len();
+    let threads = std::cmp::max(1, std::cmp::min(items, opt.threads));
 
-    thread::scope(|scope| {
-        let (result_tx, result_rx) = crossbeam_channel::bounded(128);
-        let count_idx = Arc::new(AtomicUsize::new(0));
-        let opt_arc = Arc::new(opt.clone());
+    if threads > 1 {
+        thread::scope(|scope| {
+            let (result_tx, result_rx) = crossbeam_channel::bounded(128);
+            let count_idx = Arc::new(AtomicUsize::new(0));
+            let opt_arc = Arc::new(opt.clone());
 
-        for _ in 0..threads {
-            let thread_result_tx = result_tx.clone();
-            let thread_count_idx = count_idx.clone();
-            let thread_opt = opt_arc.clone();
+            for _ in 0..threads {
+                let thread_result_tx = result_tx.clone();
+                let thread_count_idx = count_idx.clone();
+                let thread_opt = opt_arc.clone();
 
-            scope.spawn(move |_| {
-                let mut i;
-                loop {
-                    i = thread_count_idx.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    if i >= items {
-                        break;
+                scope.spawn(move |_| {
+                    let mut i;
+                    loop {
+                        i = thread_count_idx.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        if i >= items {
+                            break;
+                        }
+                        let path = &thread_opt.input[i];
+                        let mut count = Counts::new(&path);
+
+                        let bytes = if let Impl::BytesOnly = strategy {
+                            std::fs::metadata(path)
+                                .iter()
+                                .filter(|md| md.is_file())
+                                .map(|md| md.len())
+                                .next()
+                        } else {
+                            None
+                        };
+
+                        let success = if let Some(bytes) = bytes {
+                            count.bytes = bytes;
+                            Ok(())
+                        } else {
+                            File::open(&path)
+                                .and_then(|fd| strategy.count(fd, &mut count, &thread_opt))
+                        };
+
+                        let ret = match success {
+                            Ok(()) => CountResult::Ok(count),
+                            Err(e) => CountResult::Err(count.path.take().expect("path"), e),
+                        };
+
+                        if thread_result_tx.send(ComputedCount(i, ret)).is_err() {
+                            break;
+                        }
                     }
-                    let path = &thread_opt.input[i];
-                    let mut count = Counts::new(&path);
 
-                    let bytes = if let Impl::BytesOnly = strategy {
-                        std::fs::metadata(path)
-                            .iter()
-                            .filter(|md| md.is_file())
-                            .map(|md| md.len())
-                            .next()
-                    } else {
-                        None
-                    };
+                    drop(thread_result_tx);
+                });
+            }
+            drop(result_tx);
 
-                    let success = if let Some(bytes) = bytes {
-                        count.bytes = bytes;
-                        Ok(())
-                    } else {
-                        File::open(&path).and_then(|fd| strategy.count(fd, &mut count, &thread_opt))
-                    };
+            let mut buffered = BinaryHeap::new();
+            let mut next = 0;
 
-                    let ret = match success {
-                        Ok(()) => CountResult::Ok(count),
-                        Err(e) => CountResult::Err(count.path.take().expect("path"), e),
-                    };
+            for item in result_rx {
+                buffered.push(item);
 
-                    if thread_result_tx.send(ComputedCount(i, ret)).is_err() {
-                        break;
-                    }
-                }
+                while buffered.peek().map(|x| x.0) == Some(next) {
+                    let ComputedCount(_, count) = buffered.pop().expect("binary heap pop");
+                    next += 1;
 
-                drop(thread_result_tx);
-            });
-        }
-        drop(result_tx);
-
-        let mut buffered = BinaryHeap::new();
-        let mut next = 0;
-
-        for item in result_rx {
-            buffered.push(item);
-
-            while buffered.peek().map(|x| x.0) == Some(next) {
-                let ComputedCount(_, count) = buffered.pop().expect("binary heap pop");
-                next += 1;
-
-                match count {
-                    CountResult::Ok(count) => {
-                        total.add(&count);
-                        count.print(&opt, &mut out).expect("print");
-                    }
-                    CountResult::Err(path, e) => {
-                        exit_code = 1;
-                        eprintln!("{}: {}", path.display(), e);
+                    match count {
+                        CountResult::Ok(count) => {
+                            total.add(&count);
+                            count.print(&opt, &mut out).expect("stdout");
+                        }
+                        CountResult::Err(path, e) => {
+                            exit_code = 1;
+                            eprintln!("{}: {}", path.display(), e);
+                        }
                     }
                 }
             }
+        })
+        .expect("thread");
+    } else {
+        for path in &opt.input {
+            let mut count = Counts::new(&path);
+
+            let bytes = if let Impl::BytesOnly = strategy {
+                std::fs::metadata(path)
+                    .iter()
+                    .filter(|md| md.is_file())
+                    .map(|md| md.len())
+                    .next()
+            } else {
+                None
+            };
+
+            let success = if let Some(bytes) = bytes {
+                count.bytes = bytes;
+                Ok(())
+            } else {
+                File::open(&path).and_then(|fd| strategy.count(fd, &mut count, &opt))
+            };
+
+            match success {
+                Ok(()) => {
+                    total.add(&count);
+                    count.print(&opt, &mut out)?;
+                }
+                Err(e) => {
+                    exit_code = 1;
+                    eprintln!("{}: {}", path.display(), e);
+                }
+            };
         }
-    })
-    .expect("thread");
-
-    // for path in &opt.input {
-    //     if let Impl::BytesOnly = strategy {
-    //         let count = std::fs::metadata(path)
-    //             .iter()
-    //             .filter(|md| md.is_file())
-    //             .map(|md| Counts {
-    //                 bytes: md.len(),
-    //                 path: Some(path.clone()),
-    //                 ..Counts::default()
-    //             })
-    //             .next();
-
-    //         if let Some(count) = count {
-    //             total.bytes += count.bytes;
-    //             count.print(&opt, &mut out)?;
-    //             continue;
-    //         }
-    //     }
-
-    //     let mut count = Counts::new(path.clone());
-    //     let success = File::open(path).and_then(|fd| strategy.count(fd, &mut count, &opt));
-
-    //     match success {
-    //         Ok(()) => {
-    //             total.add(&count);
-    //             count.print(&opt, &mut out)?;
-    //         }
-    //         Err(e) => {
-    //             exit_code = 1;
-    //             eprintln!("{}: {}", path.display(), e);
-    //         }
-    //     }
-    // }
+    }
 
     if opt.input.len() > 1 {
         total.print(&opt, &mut out)?;
