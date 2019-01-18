@@ -545,33 +545,33 @@ fn main() -> io::Result<()> {
         thread::scope(|scope| {
             let (result_tx, result_rx) = crossbeam_channel::bounded(128);
             let count_idx = Arc::new(AtomicUsize::new(0));
-            let opt_arc = Arc::new(opt.clone());
+            let opt = Arc::new(opt.clone());
 
             for _ in 0..threads {
-                let thread_result_tx = result_tx.clone();
-                let thread_count_idx = count_idx.clone();
-                let thread_opt = opt_arc.clone();
+                let result_tx = result_tx.clone();
+                let count_idx = count_idx.clone();
+                let opt = opt.clone();
 
                 scope.spawn(move |_| {
                     let mut i;
                     loop {
-                        i = thread_count_idx.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        i = count_idx.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                         if i >= items {
                             break;
                         }
-                        let path = &thread_opt.input[i];
+                        let path = &opt.input[i];
 
-                        let ret = match strategy.count_file(&path, &thread_opt) {
+                        let ret = match strategy.count_file(&path, &opt) {
                             Ok(count) => CountResult::Ok(count),
                             Err(e) => CountResult::Err(path.clone(), e),
                         };
 
-                        if thread_result_tx.send(ComputedCount(i, ret)).is_err() {
+                        if result_tx.send(ComputedCount(i, ret)).is_err() {
                             break;
                         }
                     }
 
-                    drop(thread_result_tx);
+                    drop(result_tx);
                 });
             }
             drop(result_tx);
