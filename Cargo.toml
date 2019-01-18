@@ -1,9 +1,9 @@
 [package]
 name = "cw"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Thomas Hurst <tom@hur.st>"]
 license = "MIT"
-description = "Count Words, a wc clone"
+description = "Count Words, a fast wc clone"
 readme = "README.md"
 repository = "https://github.com/Freaky/cw"
 keywords = ["wc", "word", "count"]

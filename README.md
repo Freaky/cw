@@ -6,12 +6,12 @@ A fast `wc` clone in Rust.
 
 ```
 -% cw --help
-cw 0.4.0
+cw 0.5.0
 Thomas Hurst <tom@hur.st>
 Count Words - word, line, character and byte count
 
 USAGE:
-    cw [FLAGS] [input]...
+    cw [FLAGS] [OPTIONS] [input]...
 
 FLAGS:
     -c, --bytes              Count bytes
@@ -22,6 +22,9 @@ FLAGS:
     -V, --version            Prints version information
     -w, --words              Count words
 
+OPTIONS:
+        --threads <threads>    Number of counting threads to spawn [default: 1]
+
 ARGS:
     <input>...    Input files
 
@@ -30,6 +33,16 @@ ARGS:
 ```
 
 ## Performance
+
+Counts of multiple files may be accelerated by use of the `--threads` option:
+
+```
+  'xargs <files cw --threads=12' ran
+    2.01 ± 0.03 times faster than 'xargs <files cw --threads=4'
+    7.07 ± 0.09 times faster than 'xargs <files cw'
+   11.55 ± 0.15 times faster than 'xargs <files wc'
+   17.31 ± 0.23 times faster than 'xargs <files gwc'
+```
 
 Line counts are optimized using the [`bytecount`][bytecount] crate:
 
@@ -51,8 +64,8 @@ Note without `-m` cw only operates on bytes, and it never cares about your local
 
 ```
   'cw Dickens_Charles_Pickwick_Papers.xml' ran
-    1.34 ± 0.00 times faster than 'wc Dickens_Charles_Pickwick_Papers.xml'
-    1.90 ± 0.00 times faster than 'gwc Dickens_Charles_Pickwick_Papers.xml'
+    1.45 ± 0.01 times faster than 'wc Dickens_Charles_Pickwick_Papers.xml'
+    2.05 ± 0.00 times faster than 'gwc Dickens_Charles_Pickwick_Papers.xml'
 ```
 
 `-m` enables UTF-8 processing, with a fast-path for just character length, again
@@ -74,26 +87,27 @@ And another path for character and line length:
 
 ```
   'cw -mlL Dickens_Charles_Pickwick_Papers.xml' ran
-    3.59 ± 0.01 times faster than 'gwc -mlL Dickens_Charles_Pickwick_Papers.xml'
-    8.36 ± 0.01 times faster than 'wc -mlL Dickens_Charles_Pickwick_Papers.xml'
+    3.88 ± 0.01 times faster than 'gwc -mlL Dickens_Charles_Pickwick_Papers.xml'
+    9.05 ± 0.02 times faster than 'wc -mlL Dickens_Charles_Pickwick_Papers.xml'
 ```
 
 ```
   'cw -mlL test-utf-8.html' ran
-   10.05 ± 0.05 times faster than 'wc -mlL test-utf-8.html'
-   20.22 ± 0.11 times faster than 'gwc -mlL test-utf-8.html'
+    9.42 ± 0.01 times faster than 'wc -mlL test-utf-8.html'
+   18.95 ± 0.03 times faster than 'gwc -mlL test-utf-8.html'
 ```
 
 And a slow path for everything else:
 
 ```
   'cw -mLlw Dickens_Charles_Pickwick_Papers.xml' ran
-    1.04 ± 0.00 times faster than 'gwc -mLlw Dickens_Charles_Pickwick_Papers.xml'
-    2.41 ± 0.01 times faster than 'wc -mLlw Dickens_Charles_Pickwick_Papers.xml'
+    1.35 ± 0.00 times faster than 'gwc -mLlw Dickens_Charles_Pickwick_Papers.xml'
+    3.15 ± 0.00 times faster than 'wc -mLlw Dickens_Charles_Pickwick_Papers.xml'
 ```
 
 These tests are on FreeBSD 12 on a 2.1GHz Westmere Xeon.  `gwc` is from GNU
-coreutils 8.30.
+coreutils 8.30 - note its performance here is rather pessimised in some areas by
+FreeBSD's rather weak `memchr` implementation.  YMMV.
 
 For best results build with:
 
