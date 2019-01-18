@@ -85,13 +85,13 @@ struct Opt {
     #[structopt(short = "w", long = "words")]
     words: bool,
     /// Count bytes
-    #[structopt(short = "c", long = "bytes")]
+    #[structopt(short = "c", long = "bytes", overrides_with = "chars")]
     bytes: bool,
     /// Count bytes (default) or characters (-m) of the longest line
     #[structopt(short = "L", long = "max-line-length")]
     longest_line: bool,
     /// Count UTF-8 characters instead of bytes
-    #[structopt(short = "m", long = "chars")]
+    #[structopt(short = "m", long = "chars", overrides_with = "bytes")]
     chars: bool,
     /// Number of counting threads to spawn
     #[structopt(long = "threads", default_value = "1")]
