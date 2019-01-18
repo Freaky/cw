@@ -5,7 +5,7 @@ use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Read;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicUsize;
 use structopt::StructOpt;
 
@@ -139,6 +139,29 @@ impl Impl {
             Impl::CharsLinesLongest => count_chars_lines_longest(r, &mut count, &opt),
             Impl::CharsWordsLinesLongest => count_chars_words_lines_longest(r, &mut count, &opt),
         }
+    }
+
+    fn count_file<F: AsRef<Path>>(self, path: F, opt: &Opt) ->io::Result<Counts> {
+        let path = path.as_ref();
+        let mut count = Counts::new(path);
+
+        let bytes = if let Impl::BytesOnly = self {
+            std::fs::metadata(&path)
+                .iter()
+                .filter(|md| md.is_file())
+                .map(|md| md.len())
+                .next()
+        } else {
+            None
+        };
+
+        if let Some(bytes) = bytes {
+            count.bytes = bytes;
+        } else {
+            File::open(&path).and_then(|fd| self.count(fd, &mut count, &opt))?;
+        }
+
+        Ok(count)
     }
 }
 
@@ -537,29 +560,10 @@ fn main() -> io::Result<()> {
                             break;
                         }
                         let path = &thread_opt.input[i];
-                        let mut count = Counts::new(&path);
 
-                        let bytes = if let Impl::BytesOnly = strategy {
-                            std::fs::metadata(path)
-                                .iter()
-                                .filter(|md| md.is_file())
-                                .map(|md| md.len())
-                                .next()
-                        } else {
-                            None
-                        };
-
-                        let success = if let Some(bytes) = bytes {
-                            count.bytes = bytes;
-                            Ok(())
-                        } else {
-                            File::open(&path)
-                                .and_then(|fd| strategy.count(fd, &mut count, &thread_opt))
-                        };
-
-                        let ret = match success {
-                            Ok(()) => CountResult::Ok(count),
-                            Err(e) => CountResult::Err(count.path.take().expect("path"), e),
+                        let ret = match strategy.count_file(&path, &thread_opt) {
+                            Ok(count) => CountResult::Ok(count),
+                            Err(e) => CountResult::Err(path.clone(), e),
                         };
 
                         if thread_result_tx.send(ComputedCount(i, ret)).is_err() {
@@ -598,27 +602,8 @@ fn main() -> io::Result<()> {
         .expect("thread");
     } else {
         for path in &opt.input {
-            let mut count = Counts::new(&path);
-
-            let bytes = if let Impl::BytesOnly = strategy {
-                std::fs::metadata(path)
-                    .iter()
-                    .filter(|md| md.is_file())
-                    .map(|md| md.len())
-                    .next()
-            } else {
-                None
-            };
-
-            let success = if let Some(bytes) = bytes {
-                count.bytes = bytes;
-                Ok(())
-            } else {
-                File::open(&path).and_then(|fd| strategy.count(fd, &mut count, &opt))
-            };
-
-            match success {
-                Ok(()) => {
+            match strategy.count_file(&path, &opt) {
+                Ok(count) => {
                     total.add(&count);
                     count.print(&opt, &mut out)?;
                 }
