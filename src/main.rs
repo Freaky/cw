@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
@@ -98,6 +97,12 @@ struct Opt {
     /// Number of counting threads to spawn
     #[structopt(long = "threads", default_value = "1")]
     threads: usize,
+    /// Read input from the newline-terminated list of filenames in the given file.
+    #[structopt(long = "files-from")]
+    files_from: Option<PathBuf>,
+    /// Read input from the NUL-terminated list of filenames in the given file.
+    #[structopt(long = "files0-from")]
+    files0_from: Option<PathBuf>,
     /// Input files
     #[structopt(parse(from_os_str))]
     input: Vec<PathBuf>,
@@ -491,13 +496,47 @@ impl PartialEq for ComputedCount {
 }
 impl Eq for ComputedCount {}
 impl PartialOrd for ComputedCount {
-    fn partial_cmp(&self, o: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
         o.0.partial_cmp(&self.0)
     }
 }
 impl Ord for ComputedCount {
-    fn cmp(&self, o: &Self) -> Ordering {
+    fn cmp(&self, o: &Self) -> std::cmp::Ordering {
         o.0.cmp(&self.0)
+    }
+}
+
+#[cfg(unix)]
+fn bytes_to_pathbuf(bytes: &[u8]) -> PathBuf {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    PathBuf::from(OsStr::from_bytes(bytes).to_owned())
+}
+
+#[cfg(not(unix))]
+fn bytes_to_pathbuf(bytes: &[u8]) -> PathBuf {
+    // Blargh, it'll do for now, I guess :/
+    PathBuf::from(String::from_utf8_lossy(&bytes).to_string())
+}
+
+fn append_delimited_filenames_read<R: Read>(source: R, dest: &mut Vec<PathBuf>, delimiter: u8) -> io::Result<()> {
+    let reader = BufReader::new(source);
+
+    for file in reader.split(delimiter).map(|name| name.map(|n| bytes_to_pathbuf(&n))) {
+        dest.push(file?);
+    }
+
+    Ok(())
+}
+
+fn append_delimited_filenames<P: AsRef<Path>>(source: P, mut dest: &mut Vec<PathBuf>, delimiter: u8) -> io::Result<()> {
+    let source = source.as_ref();
+
+    if source == Path::new("-") {
+        append_delimited_filenames_read(&mut io::stdin(), &mut dest, delimiter)
+    } else {
+        append_delimited_filenames_read(File::open(source)?, &mut dest, delimiter)
     }
 }
 
@@ -518,6 +557,14 @@ fn main() -> io::Result<()> {
 
     if opt.chars {
         opt.bytes = false;
+    }
+
+    if let Some(ref path) = opt.files_from {
+        append_delimited_filenames(path, &mut opt.input, b'\n')?;
+    }
+
+    if let Some(ref path) = opt.files0_from {
+        append_delimited_filenames(path, &mut opt.input, b'\0')?;
     }
 
     let strategies = Strategies::new();

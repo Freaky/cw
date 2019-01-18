@@ -23,7 +23,9 @@ FLAGS:
     -w, --words              Count words
 
 OPTIONS:
-        --threads <threads>    Number of counting threads to spawn [default: 1]
+        --files0-from <files0_from>    Read input from the NUL-terminated list of filenames in the given file.
+        --files-from <files_from>      Read input from the newline-terminated list of filenames in the given file.
+        --threads <threads>            Number of counting threads to spawn [default: 1]
 
 ARGS:
     <input>...    Input files

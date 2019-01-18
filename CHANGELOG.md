@@ -4,6 +4,7 @@
 ### Added
 - This `CHANGELOG.md`.
 - `--threads` support, defaulting to off.
+- `--files0-from` and `--files-from`, similar to GNU wc.
 
 ### Changed
 - ~15% performance bump for slow `-w` and `-mw` paths.
