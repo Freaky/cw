@@ -1,12 +1,14 @@
-use memchr::memchr_iter;
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 use std::fs::File;
-use std::io;
-use std::io::BufRead;
-use std::io::BufReader;
-use std::io::Read;
-use std::io::Write;
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
+
+use crossbeam_channel;
+use crossbeam_utils::thread;
+use memchr::memchr_iter;
 use structopt::StructOpt;
 
 const READ_SIZE: usize = 1024 * 32;
@@ -141,7 +143,7 @@ impl Impl {
         }
     }
 
-    fn count_file<F: AsRef<Path>>(self, path: F, opt: &Opt) ->io::Result<Counts> {
+    fn count_file<F: AsRef<Path>>(self, path: F, opt: &Opt) -> io::Result<Counts> {
         let path = path.as_ref();
         let mut count = Counts::new(path);
 
@@ -480,18 +482,7 @@ fn count_chars_words_lines_longest<R: Read>(r: R, count: &mut Counts, opt: &Opt)
     Ok(())
 }
 
-enum CountResult {
-    Ok(Counts),
-    Err(PathBuf, io::Error),
-}
-
-use crossbeam_channel;
-use crossbeam_utils::thread;
-use std::cmp::Ordering;
-use std::collections::BinaryHeap;
-use std::sync::Arc;
-
-struct ComputedCount(usize, CountResult);
+struct ComputedCount(usize, Result<Counts, (PathBuf, io::Error)>);
 
 impl PartialEq for ComputedCount {
     fn eq(&self, o: &Self) -> bool {
@@ -561,10 +552,9 @@ fn main() -> io::Result<()> {
                         }
                         let path = &opt.input[i];
 
-                        let ret = match strategy.count_file(&path, &opt) {
-                            Ok(count) => CountResult::Ok(count),
-                            Err(e) => CountResult::Err(path.clone(), e),
-                        };
+                        let ret = strategy
+                            .count_file(&path, &opt)
+                            .map_err(|e| (path.clone(), e));
 
                         if result_tx.send(ComputedCount(i, ret)).is_err() {
                             break;
@@ -587,11 +577,11 @@ fn main() -> io::Result<()> {
                     next += 1;
 
                     match count {
-                        CountResult::Ok(count) => {
+                        Ok(count) => {
                             total.add(&count);
                             count.print(&opt, &mut out).expect("stdout");
                         }
-                        CountResult::Err(path, e) => {
+                        Err((path, e)) => {
                             exit_code = 1;
                             eprintln!("{}: {}", path.display(), e);
                         }
