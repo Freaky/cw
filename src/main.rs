@@ -539,7 +539,7 @@ fn main() -> io::Result<()> {
     }
 
     let items = opt.input.len();
-    let threads = std::cmp::max(1, std::cmp::min(items, opt.threads));
+    let threads = std::cmp::min(items, opt.threads);
 
     if threads > 1 {
         thread::scope(|scope| {
