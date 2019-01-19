@@ -27,13 +27,13 @@ struct Opt {
     #[structopt(short = "w", long = "words")]
     words: bool,
     /// Count bytes
-    #[structopt(short = "c", long = "bytes", overrides_with = "chars")]
+    #[structopt(short = "c", long = "bytes", overrides_with = "chars", multiple=true)]
     bytes: bool,
     /// Count bytes (default) or characters (-m) of the longest line
     #[structopt(short = "L", long = "max-line-length")]
     longest_line: bool,
     /// Count UTF-8 characters instead of bytes
-    #[structopt(short = "m", long = "chars", overrides_with = "bytes")]
+    #[structopt(short = "m", long = "chars", overrides_with = "bytes", multiple=true)]
     chars: bool,
     /// Number of counting threads to spawn
     #[structopt(long = "threads", default_value = "1")]
@@ -494,10 +494,6 @@ fn main() -> io::Result<()> {
         opt.lines = true;
         opt.bytes = true;
         opt.words = true;
-    }
-
-    if opt.chars {
-        opt.bytes = false;
     }
 
     if let Some(ref path) = opt.files_from {
