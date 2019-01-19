@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.0] - 2019-01-?? (unreleased)
+### Changed
+- Allow multiple `-m` and `-c` arguments.
+- Hook up `SIGINFO` handler to `SIGUSR1` on inferior Unix-like platforms.
+
+
 ## [0.5.0] - 2019-01-18
 ### Added
 - This `CHANGELOG.md`.
