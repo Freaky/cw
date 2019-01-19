@@ -12,66 +12,7 @@ use structopt::StructOpt;
 
 const READ_SIZE: usize = 1024 * 32;
 
-#[cfg(any(
-    target_os = "macos",
-    target_os = "ios",
-    target_os = "freebsd",
-    target_os = "dragonfly",
-    target_os = "openbsd",
-    target_os = "netbsd",
-    target_os = "bitrig"
-))]
-mod sig {
-    use libc::{c_int, c_void, sighandler_t, signal, SIGINFO};
-    use std::cell::RefCell;
-    use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
-    use std::thread_local;
-
-    static SIGINFO_RECEIVED: AtomicUsize = ATOMIC_USIZE_INIT;
-    thread_local! {
-        static SIGINFO_GEN: RefCell<usize> = RefCell::new(0);
-    }
-
-    extern "C" fn trigger_signal(_: c_int) {
-        SIGINFO_RECEIVED.fetch_add(1, std::sync::atomic::Ordering::Release);
-    }
-
-    fn get_handler() -> sighandler_t {
-        trigger_signal as extern "C" fn(c_int) as *mut c_void as sighandler_t
-    }
-
-    pub fn check_signal() -> bool {
-        SIGINFO_GEN.with(|gen| {
-            let current = SIGINFO_RECEIVED.load(std::sync::atomic::Ordering::Acquire);
-            let received = current != *gen.borrow();
-            *gen.borrow_mut() = current;
-            return received;
-        })
-    }
-
-    pub fn hook_signal() {
-        unsafe {
-            signal(SIGINFO, get_handler());
-        }
-    }
-}
-
-#[cfg(not(any(
-    target_os = "macos",
-    target_os = "ios",
-    target_os = "freebsd",
-    target_os = "dragonfly",
-    target_os = "openbsd",
-    target_os = "netbsd",
-    target_os = "bitrig"
-)))]
-mod sig {
-    pub fn check_signal() -> bool {
-        false
-    }
-
-    pub fn hook_signal() {}
-}
+mod siginfo;
 
 #[derive(Debug, StructOpt, Clone)]
 #[structopt(
@@ -334,7 +275,7 @@ macro_rules! define_count {
                 count.bytes += len as u64;
                 reader.consume(len);
 
-                if sig::check_signal() {
+                if siginfo::check_signal() {
                     let err = io::stderr();
                     let mut errl = err.lock();
                     let _ = count.print(&opt, &mut errl);
@@ -477,7 +418,7 @@ fn count_chars_words_lines_longest<R: Read>(r: R, count: &mut Counts, opt: &Opt)
         }
         buf.clear();
 
-        if sig::check_signal() {
+        if siginfo::check_signal() {
             let err = io::stderr();
             let mut errl = err.lock();
             let _ = count.print(&opt, &mut errl);
@@ -547,7 +488,7 @@ fn main() -> io::Result<()> {
     let mut out = stdout.lock();
     let mut exit_code = 0;
 
-    sig::hook_signal();
+    siginfo::hook_signal();
 
     if !(opt.bytes || opt.words || opt.chars || opt.lines || opt.longest_line) {
         opt.lines = true;
