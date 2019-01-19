@@ -1,17 +1,9 @@
 
-#[cfg(any(
-    target_os = "macos",
-    target_os = "ios",
-    target_os = "freebsd",
-    target_os = "dragonfly",
-    target_os = "openbsd",
-    target_os = "netbsd",
-    target_os = "bitrig"
-))]
+#[cfg(unix)]
 mod sig {
-    use libc::{c_int, c_void, sighandler_t, signal, SIGINFO};
+    use libc::{c_int, c_void, sighandler_t, signal};
     use std::cell::RefCell;
-    use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
+    use std::sync::atomic::{Ordering, AtomicUsize, ATOMIC_USIZE_INIT};
     use std::thread_local;
 
     static SIGINFO_RECEIVED: AtomicUsize = ATOMIC_USIZE_INIT;
@@ -20,7 +12,7 @@ mod sig {
     }
 
     extern "C" fn trigger_signal(_: c_int) {
-        SIGINFO_RECEIVED.fetch_add(1, std::sync::atomic::Ordering::Release);
+        SIGINFO_RECEIVED.fetch_add(1, Ordering::Release);
     }
 
     fn get_handler() -> sighandler_t {
@@ -29,7 +21,7 @@ mod sig {
 
     pub(crate) fn check_signal() -> bool {
         SIGINFO_GEN.with(|gen| {
-            let current = SIGINFO_RECEIVED.load(std::sync::atomic::Ordering::Acquire);
+            let current = SIGINFO_RECEIVED.load(Ordering::Acquire);
             let received = current != *gen.borrow();
             *gen.borrow_mut() = current;
             received
@@ -37,21 +29,36 @@ mod sig {
     }
 
     pub(crate) fn hook_signal() {
+        #[cfg(any(
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "freebsd",
+            target_os = "dragonfly",
+            target_os = "openbsd",
+            target_os = "netbsd",
+            target_os = "bitrig"
+        ))]
+        let sig = libc::SIGINFO;
+
+        #[cfg(not(any(
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "freebsd",
+            target_os = "dragonfly",
+            target_os = "openbsd",
+            target_os = "netbsd",
+            target_os = "bitrig"
+        )))]
+        let sig = libc::SIGUSR1;
+
         unsafe {
-            signal(SIGINFO, get_handler());
+            signal(sig, get_handler());
         }
     }
 }
 
-#[cfg(not(any(
-    target_os = "macos",
-    target_os = "ios",
-    target_os = "freebsd",
-    target_os = "dragonfly",
-    target_os = "openbsd",
-    target_os = "netbsd",
-    target_os = "bitrig"
-)))]
+
+#[cfg(not(unix))]
 mod sig {
     pub(crate) fn check_signal() -> bool {
         false
