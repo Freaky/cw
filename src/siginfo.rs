@@ -29,30 +29,19 @@ mod sig {
     }
 
     pub(crate) fn hook_signal() {
-        #[cfg(any(
-            target_os = "macos",
-            target_os = "ios",
-            target_os = "freebsd",
-            target_os = "dragonfly",
-            target_os = "openbsd",
-            target_os = "netbsd",
-            target_os = "bitrig"
-        ))]
-        let sig = libc::SIGINFO;
-
-        #[cfg(not(any(
-            target_os = "macos",
-            target_os = "ios",
-            target_os = "freebsd",
-            target_os = "dragonfly",
-            target_os = "openbsd",
-            target_os = "netbsd",
-            target_os = "bitrig"
-        )))]
-        let sig = libc::SIGUSR1;
-
         unsafe {
-            signal(sig, get_handler());
+            #[cfg(any(
+                target_os = "macos",
+                target_os = "ios",
+                target_os = "freebsd",
+                target_os = "dragonfly",
+                target_os = "openbsd",
+                target_os = "netbsd",
+                target_os = "bitrig"
+            ))]
+            signal(libc::SIGINFO, get_handler());
+
+            signal(libc::SIGUSR1, get_handler());
         }
     }
 }
