@@ -367,7 +367,7 @@ impl Counter for CountCharsLinesLongest {
         }
     }
 
-    // Fast path for -lL
+    // Fast path for -mlL
     fn_count!(|| {
         let mut last_chars = 0;
 
