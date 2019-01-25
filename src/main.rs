@@ -79,75 +79,59 @@ impl Capability {
     }
 }
 
-#[derive(Clone, Copy)]
-enum Strategy {
-    BytesOnly(CountBytesOnly),
-    LinesOnly(CountLinesOnly),
-    CharsOnly(CountCharsOnly),
-    LinesLongest(CountLinesOnly),
-    WordsLinesLongest(CountWordsLinesLongest),
-    CharsLinesLongest(CountCharsLinesLongest),
-    CharsWordsLinesLongest(CountCharsWordsLinesLongest),
+macro_rules! counter_strategies {
+    ($($name:ident,)+) => {
+        #[derive(Debug, Clone, Copy)]
+        enum Strategy {
+            $($name,)+
+        }
+
+        impl Strategy {
+            fn select(opt: &Opt) -> Self {
+                let strategies = [
+                    $((Strategy::$name, $name.capabilities()),)+
+                ];
+
+                strategies
+                    .iter()
+                    .filter(|(_, cap)| cap.is_compatible(&opt))
+                    .min_by(|(_, a), (_, b)| a.rank.cmp(&b.rank))
+                    .map(|(strat, _)| *strat)
+                    .expect("[BUG] Unable to find a suitable implementation")
+            }
+        }
+
+        impl Counter for Strategy {
+            fn capabilities(&self) -> Capability {
+                match self {
+                    $(Strategy::$name => $name.capabilities(),)+
+                }
+            }
+
+
+            fn count<R: Read>(&self, r: R, mut count: &mut Counts, opt: &Opt) -> io::Result<()> {
+                match self {
+                    $(Strategy::$name => $name.count(r, &mut count, &opt),)+
+                }
+            }
+
+            fn count_file<F: AsRef<Path>>(&self, path: F, opt: &Opt) -> io::Result<Counts> {
+                match self {
+                    $(Strategy::$name => $name.count_file(path, &opt),)+
+                }
+            }
+        }
+    }
 }
 
-impl Strategy {
-    fn select(opt: &Opt) -> Self {
-        let strategies = [
-            Strategy::BytesOnly(CountBytesOnly),
-            Strategy::LinesOnly(CountLinesOnly),
-            Strategy::CharsOnly(CountCharsOnly),
-            Strategy::LinesLongest(CountLinesOnly),
-            Strategy::WordsLinesLongest(CountWordsLinesLongest),
-            Strategy::CharsLinesLongest(CountCharsLinesLongest),
-            Strategy::CharsWordsLinesLongest(CountCharsWordsLinesLongest),
-        ];
-
-        strategies
-            .iter()
-            .map(|s| (s, s.capabilities()))
-            .filter(|(_, cap)| cap.is_compatible(&opt))
-            .min_by(|(_, a), (_, b)| a.rank.cmp(&b.rank))
-            .map(|(strat, _)| *strat)
-            .expect("[BUG] Unable to find a suitable implementation")
-    }
-}
-
-impl Counter for Strategy {
-    fn capabilities(&self) -> Capability {
-        match self {
-            Strategy::BytesOnly(strat) => strat.capabilities(),
-            Strategy::LinesOnly(strat) => strat.capabilities(),
-            Strategy::CharsOnly(strat) => strat.capabilities(),
-            Strategy::LinesLongest(strat) => strat.capabilities(),
-            Strategy::WordsLinesLongest(strat) => strat.capabilities(),
-            Strategy::CharsLinesLongest(strat) => strat.capabilities(),
-            Strategy::CharsWordsLinesLongest(strat) => strat.capabilities(),
-        }
-    }
-
-    fn count<R: Read>(&self, r: R, mut count: &mut Counts, opt: &Opt) -> io::Result<()> {
-        match self {
-            Strategy::BytesOnly(strat) => strat.count(r, &mut count, &opt),
-            Strategy::LinesOnly(strat) => strat.count(r, &mut count, &opt),
-            Strategy::CharsOnly(strat) => strat.count(r, &mut count, &opt),
-            Strategy::LinesLongest(strat) => strat.count(r, &mut count, &opt),
-            Strategy::WordsLinesLongest(strat) => strat.count(r, &mut count, &opt),
-            Strategy::CharsLinesLongest(strat) => strat.count(r, &mut count, &opt),
-            Strategy::CharsWordsLinesLongest(strat) => strat.count(r, &mut count, &opt),
-        }
-    }
-
-    fn count_file<F: AsRef<Path>>(&self, path: F, opt: &Opt) -> io::Result<Counts> {
-        match self {
-            Strategy::BytesOnly(strat) => strat.count_file(path, &opt),
-            Strategy::LinesOnly(strat) => strat.count_file(path, &opt),
-            Strategy::CharsOnly(strat) => strat.count_file(path, &opt),
-            Strategy::LinesLongest(strat) => strat.count_file(path, &opt),
-            Strategy::WordsLinesLongest(strat) => strat.count_file(path, &opt),
-            Strategy::CharsLinesLongest(strat) => strat.count_file(path, &opt),
-            Strategy::CharsWordsLinesLongest(strat) => strat.count_file(path, &opt),
-        }
-    }
+counter_strategies! {
+    CountBytesOnly,
+    CountLinesOnly,
+    CountCharsOnly,
+    CountLinesLongest,
+    CountWordsLinesLongest,
+    CountCharsLinesLongest,
+    CountCharsWordsLinesLongest,
 }
 
 trait Counter {
