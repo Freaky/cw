@@ -11,12 +11,12 @@ use crate::siginfo;
 
 #[derive(Debug, Default)]
 pub struct Counts {
-    path: Option<PathBuf>,
-    lines: u64,
-    words: u64,
-    bytes: u64,
-    chars: u64,
-    longest_line: u64,
+    pub path: Option<PathBuf>,
+    pub lines: u64,
+    pub words: u64,
+    pub bytes: u64,
+    pub chars: u64,
+    pub longest_line: u64,
 }
 
 #[derive(Debug, Default)]
