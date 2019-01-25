@@ -180,8 +180,6 @@ macro_rules! fn_count {
     };
 }
 
-
-#[derive(Clone, Copy)]
 struct CountBytesOnly;
 impl Counter for CountBytesOnly {
     fn capabilities(&self) -> Capability {
@@ -218,7 +216,6 @@ impl Counter for CountBytesOnly {
     });
 }
 
-#[derive(Clone, Copy)]
 struct CountLinesOnly;
 impl Counter for CountLinesOnly {
     fn capabilities(&self) -> Capability {
@@ -236,7 +233,6 @@ impl Counter for CountLinesOnly {
     });
 }
 
-#[derive(Clone, Copy)]
 struct CountCharsOnly;
 impl Counter for CountCharsOnly {
     fn capabilities(&self) -> Capability {
@@ -254,7 +250,6 @@ impl Counter for CountCharsOnly {
     });
 }
 
-#[derive(Clone, Copy)]
 struct CountLinesLongest;
 impl Counter for CountLinesLongest {
     fn capabilities(&self) -> Capability {
@@ -291,7 +286,6 @@ impl Counter for CountLinesLongest {
     });
 }
 
-#[derive(Clone, Copy)]
 struct CountWordsLinesLongest;
 impl Counter for CountWordsLinesLongest {
     fn capabilities(&self) -> Capability {
@@ -337,7 +331,6 @@ impl Counter for CountWordsLinesLongest {
     });
 }
 
-#[derive(Clone, Copy)]
 struct CountCharsLinesLongest;
 impl Counter for CountCharsLinesLongest {
     fn capabilities(&self) -> Capability {
@@ -378,7 +371,6 @@ impl Counter for CountCharsLinesLongest {
     });
 }
 
-#[derive(Clone, Copy)]
 struct CountCharsWordsLinesLongest;
 impl Counter for CountCharsWordsLinesLongest {
     fn capabilities(&self) -> Capability {
