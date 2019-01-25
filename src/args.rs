@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Default, StructOpt, Clone)]
 #[structopt(
     name = "cw",
     about = "Count Words - word, line, character and byte count"

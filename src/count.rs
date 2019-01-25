@@ -1,4 +1,6 @@
 use std::fs::File;
+#[cfg(test)]
+use std::io::Cursor;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 
@@ -219,6 +221,15 @@ impl Counter for BytesOnly {
     fn_count!(|| |_buf: &[u8], _count: &mut Counts| { /* ... */ });
 }
 
+#[test]
+fn test_bytes() {
+    let mut c = Counts::default();
+    BytesOnly
+        .count(Cursor::new(b"12345678"), &mut c, &Opt::default())
+        .unwrap();
+    assert_eq!(c.bytes, 8);
+}
+
 struct LinesOnly;
 impl Counter for LinesOnly {
     fn capabilities(&self) -> Capability {
@@ -236,6 +247,15 @@ impl Counter for LinesOnly {
     });
 }
 
+#[test]
+fn test_lines() {
+    let mut c = Counts::default();
+    LinesOnly
+        .count(Cursor::new(b"\n\n\n\n\n\n\n\n"), &mut c, &Opt::default())
+        .unwrap();
+    assert_eq!(c.lines, 8);
+}
+
 struct CharsOnly;
 impl Counter for CharsOnly {
     fn capabilities(&self) -> Capability {
@@ -251,6 +271,16 @@ impl Counter for CharsOnly {
     fn_count!(|| |buf: &[u8], count: &mut Counts| {
         count.chars += bytecount::num_chars(&buf) as u64;
     });
+}
+
+#[test]
+fn test_chars() {
+    let mut c = Counts::default();
+    CharsOnly
+        .count(Cursor::new(b"fo\xC3\xB3"), &mut c, &Opt::default())
+        .unwrap();
+    assert_eq!(c.chars, 3);
+    assert_eq!(c.bytes, 4);
 }
 
 struct LinesLongest;
@@ -287,6 +317,20 @@ impl Counter for LinesLongest {
             line_len = (buf.len() - last_pos as usize) as u64;
         }
     });
+}
+
+#[test]
+fn test_lines_longest() {
+    let mut c = Counts::default();
+    LinesLongest
+        .count(
+            Cursor::new(b"foo\nbar\nmoooo\nhmm\n"),
+            &mut c,
+            &Opt::default(),
+        )
+        .unwrap();
+    assert_eq!(c.lines, 4);
+    assert_eq!(c.longest_line, 5);
 }
 
 struct WordsLinesLongest;
@@ -334,6 +378,21 @@ impl Counter for WordsLinesLongest {
     });
 }
 
+#[test]
+fn test_words_lines_longest() {
+    let mut c = Counts::default();
+    WordsLinesLongest
+        .count(
+            Cursor::new(b"one two\nthree\nfour five six\n"),
+            &mut c,
+            &Opt::default(),
+        )
+        .unwrap();
+    assert_eq!(c.lines, 3);
+    assert_eq!(c.words, 6);
+    assert_eq!(c.longest_line, 13);
+}
+
 struct CharsLinesLongest;
 impl Counter for CharsLinesLongest {
     fn capabilities(&self) -> Capability {
@@ -374,6 +433,21 @@ impl Counter for CharsLinesLongest {
     });
 }
 
+#[test]
+fn test_chars_lines_longest() {
+    let mut c = Counts::default();
+    CharsLinesLongest
+        .count(
+            Cursor::new(b"foo\nbar\nmoo\xC3\xB3o\nhmm\n"),
+            &mut c,
+            &Opt::default(),
+        )
+        .unwrap();
+    assert_eq!(c.lines, 4);
+    assert_eq!(c.chars, c.bytes - 1);
+    assert_eq!(c.longest_line, 5);
+}
+
 struct CharsWordsLinesLongest;
 impl Counter for CharsWordsLinesLongest {
     fn capabilities(&self) -> Capability {
@@ -397,6 +471,7 @@ impl Counter for CharsWordsLinesLongest {
         // Could do with a mbrtowc() workalike really.
         let mut buf = String::with_capacity(READ_SIZE);
         while reader.by_ref().take(READ_SIZE as u64).read_line(&mut buf)? > 0 {
+            count.bytes += buf.len() as u64;
             for c in buf.chars() {
                 count.chars += 1;
                 if c.is_whitespace() {
@@ -431,4 +506,20 @@ impl Counter for CharsWordsLinesLongest {
 
         Ok(())
     }
+}
+
+#[test]
+fn test_chars_words_lines_longest() {
+    let mut c = Counts::default();
+    CharsWordsLinesLongest
+        .count(
+            Cursor::new(b"\xC3\xB3ne two\nthree\nfour five six\n"),
+            &mut c,
+            &Opt::default(),
+        )
+        .unwrap();
+    assert_eq!(c.lines, 3);
+    assert_eq!(c.words, 6);
+    assert_eq!(c.chars, c.bytes - 1);
+    assert_eq!(c.longest_line, 13);
 }
