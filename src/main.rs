@@ -1,18 +1,18 @@
-use structopt::StructOpt;
 use std::collections::BinaryHeap;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
+use structopt::StructOpt;
 
 use crossbeam_channel;
 use crossbeam_utils::thread;
 
 use cw;
-use cw::siginfo;
 use cw::args::Opt;
-use cw::count::{Strategy, Counts, Counter};
+use cw::count::{Counter, Counts, Strategy};
+use cw::siginfo;
 
 struct ComputedCount(usize, Result<Counts, (PathBuf, io::Error)>);
 
@@ -47,17 +47,28 @@ fn bytes_to_pathbuf(bytes: &[u8]) -> PathBuf {
     PathBuf::from(String::from_utf8_lossy(&bytes).to_string())
 }
 
-fn append_delimited_filenames_read<R: Read>(source: R, dest: &mut Vec<PathBuf>, delimiter: u8) -> io::Result<()> {
+fn append_delimited_filenames_read<R: Read>(
+    source: R,
+    dest: &mut Vec<PathBuf>,
+    delimiter: u8,
+) -> io::Result<()> {
     let reader = BufReader::new(source);
 
-    for file in reader.split(delimiter).map(|name| name.map(|n| bytes_to_pathbuf(&n))) {
+    for file in reader
+        .split(delimiter)
+        .map(|name| name.map(|n| bytes_to_pathbuf(&n)))
+    {
         dest.push(file?);
     }
 
     Ok(())
 }
 
-fn append_delimited_filenames<P: AsRef<Path>>(source: P, mut dest: &mut Vec<PathBuf>, delimiter: u8) -> io::Result<()> {
+fn append_delimited_filenames<P: AsRef<Path>>(
+    source: P,
+    mut dest: &mut Vec<PathBuf>,
+    delimiter: u8,
+) -> io::Result<()> {
     let source = source.as_ref();
 
     if source == Path::new("-") {

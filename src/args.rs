@@ -14,13 +14,13 @@ pub struct Opt {
     #[structopt(short = "w", long = "words")]
     pub words: bool,
     /// Count bytes
-    #[structopt(short = "c", long = "bytes", overrides_with = "chars", multiple=true)]
+    #[structopt(short = "c", long = "bytes", overrides_with = "chars", multiple = true)]
     pub bytes: bool,
     /// Count bytes (default) or characters (-m) of the longest line
     #[structopt(short = "L", long = "max-line-length")]
     pub longest_line: bool,
     /// Count UTF-8 characters instead of bytes
-    #[structopt(short = "m", long = "chars", overrides_with = "bytes", multiple=true)]
+    #[structopt(short = "m", long = "chars", overrides_with = "bytes", multiple = true)]
     pub chars: bool,
     /// Number of counting threads to spawn
     #[structopt(long = "threads", default_value = "1")]

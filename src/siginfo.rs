@@ -1,9 +1,8 @@
-
 #[cfg(unix)]
 mod sig {
     use libc::{c_int, c_void, sighandler_t, signal};
     use std::cell::RefCell;
-    use std::sync::atomic::{Ordering, AtomicUsize, ATOMIC_USIZE_INIT};
+    use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
     use std::thread_local;
 
     static SIGINFO_RECEIVED: AtomicUsize = ATOMIC_USIZE_INIT;
@@ -45,7 +44,6 @@ mod sig {
         }
     }
 }
-
 
 #[cfg(not(unix))]
 mod sig {

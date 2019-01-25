@@ -6,8 +6,8 @@ use memchr::memchr_iter;
 
 const READ_SIZE: usize = 1024 * 32;
 
-use crate::siginfo;
 use crate::args::Opt;
+use crate::siginfo;
 
 #[derive(Debug, Default)]
 pub struct Counts {
@@ -216,9 +216,7 @@ impl Counter for BytesOnly {
     }
 
     // Null counting: just let the macro count read() bytes
-    fn_count!(|| |_buf: &[u8], _count: &mut Counts| {
-        /* ... */
-    });
+    fn_count!(|| |_buf: &[u8], _count: &mut Counts| { /* ... */ });
 }
 
 struct LinesOnly;
