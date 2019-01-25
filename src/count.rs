@@ -44,10 +44,7 @@ impl Counts {
         self.words += other.words;
         self.bytes += other.bytes;
         self.chars += other.chars;
-
-        if self.longest_line < other.longest_line {
-            self.longest_line = other.longest_line
-        }
+        self.longest_line = std::cmp::max(self.longest_line, other.longest_line);
     }
 
     pub fn print<W: Write>(&self, opt: &Opt, mut out: W) -> io::Result<()> {
