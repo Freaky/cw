@@ -19,7 +19,7 @@ mod sig {
         trigger_signal as extern "C" fn(c_int) as *mut c_void as sighandler_t
     }
 
-    pub(crate) fn check_signal() -> bool {
+    pub fn check_signal() -> bool {
         SIGINFO_GEN.with(|gen| {
             let current = SIGINFO_RECEIVED.load(Ordering::Acquire);
             let received = current != *gen.borrow();
@@ -28,7 +28,7 @@ mod sig {
         })
     }
 
-    pub(crate) fn hook_signal() {
+    pub fn hook_signal() {
         unsafe {
             #[cfg(any(
                 target_os = "macos",
@@ -49,11 +49,11 @@ mod sig {
 
 #[cfg(not(unix))]
 mod sig {
-    pub(crate) fn check_signal() -> bool {
+    pub fn check_signal() -> bool {
         false
     }
 
-    pub(crate) fn hook_signal() {}
+    pub fn hook_signal() {}
 }
 
-pub(crate) use sig::*;
+pub use sig::*;
