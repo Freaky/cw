@@ -2,10 +2,10 @@
 mod sig {
     use libc::{c_int, c_void, sighandler_t, signal};
     use std::cell::RefCell;
-    use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::thread_local;
 
-    static SIGINFO_RECEIVED: AtomicUsize = ATOMIC_USIZE_INIT;
+    static SIGINFO_RECEIVED: AtomicUsize = AtomicUsize::new(0);
     thread_local! {
         static SIGINFO_GEN: RefCell<usize> = RefCell::new(0);
     }
