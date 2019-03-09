@@ -202,7 +202,7 @@ impl Counter for BytesOnly {
         let bytes = std::fs::metadata(&path)
             .iter()
             .filter(|md| md.is_file())
-            .map(|md| md.len())
+            .map(std::fs::Metadata::len)
             .next();
 
         if let Some(bytes) = bytes {
