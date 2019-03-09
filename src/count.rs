@@ -91,8 +91,8 @@ macro_rules! counter_strategies {
             $($name,)+
         }
 
-        impl Strategy {
-            pub fn select(opt: &Opt) -> Self {
+        impl From<&Opt> for Strategy {
+            fn from(opt: &Opt) -> Self {
                 let strategies = [
                     $((Strategy::$name, $name.capabilities()),)+
                 ];

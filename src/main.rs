@@ -101,7 +101,7 @@ fn main() -> io::Result<()> {
         append_delimited_filenames(path, &mut opt.input, b'\0')?;
     }
 
-    let strategy = Strategy::select(&opt);
+    let strategy = Strategy::from(&opt);
 
     if opt.input.is_empty() {
         let mut count = Counts::default();
