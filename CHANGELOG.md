@@ -1,10 +1,15 @@
 # Changelog
 
-## [0.6.0] - 2019-01-?? (unreleased)
-### Changed
-- Allow multiple `-m` and `-c` arguments.
-- Hook up `SIGINFO` handler to `SIGUSR1` on inferior Unix-like platforms.
+## [0.6.0] - 2019-03-13
+### Added
+- Some basic tests.
 
+### Changed
+- Hook up `SIGINFO` handler to `SIGUSR1` on inferior Unix-like platforms.
+- Split into library and binary (#1)
+
+### Fixed
+- Multiple `-m` and `-c` arguments.
 
 ## [0.5.0] - 2019-01-18
 ### Added
@@ -46,6 +51,7 @@
  - Initial release.
 
 
+[0.6.0]: https://github.com/Freaky/cw/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Freaky/cw/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Freaky/cw/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Freaky/cw/releases/tag/v0.3.0
