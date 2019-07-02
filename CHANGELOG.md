@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0] - 2019-07-02
+### Changed
+ - Use bstr for the slow multibyte path to cope with invalid UTF-8.
+
+### Fixed
+ - Parse --files-from and --files0-from arguments properly.
+
 ## [0.6.0] - 2019-03-13
 ### Added
 - Some basic tests.

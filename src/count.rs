@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 
 use memchr::memchr_iter;
 
+use bstr::ByteSlice;
+
 const READ_SIZE: usize = 1024 * 32;
 
 use crate::args::Opt;
@@ -466,8 +468,10 @@ impl Counter for CharsWordsLinesLongest {
 
         // Lines are useful sync points for multibyte reading
         // Could do with a mbrtowc() workalike really.
-        let mut buf = String::with_capacity(READ_SIZE);
-        while reader.by_ref().take(READ_SIZE as u64).read_line(&mut buf)? > 0 {
+        //
+        // We limit reads to READ_SIZE to place an upper-bound on memory use.
+        let mut buf = Vec::with_capacity(READ_SIZE);
+        while reader.by_ref().take(READ_SIZE as u64).read_until(b'\n', &mut buf)? > 0 {
             count.bytes += buf.len() as u64;
             for c in buf.chars() {
                 count.chars += 1;
