@@ -3,7 +3,6 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicUsize;
-use std::sync::Arc;
 use structopt::StructOpt;
 
 use crossbeam_channel;
@@ -113,15 +112,16 @@ fn main() -> io::Result<()> {
     let threads = std::cmp::min(items, opt.threads);
 
     if threads > 1 {
+        let count_idx = AtomicUsize::new(0);
         thread::scope(|scope| {
             let (result_tx, result_rx) = crossbeam_channel::bounded(128);
-            let count_idx = Arc::new(AtomicUsize::new(0));
-            let opt = Arc::new(opt.clone());
+
+            // Create refs, so we only move these refs into scope.spawn
+            let count_idx = &count_idx;
+            let opt = &opt;
 
             for _ in 0..threads {
                 let result_tx = result_tx.clone();
-                let count_idx = count_idx.clone();
-                let opt = opt.clone();
 
                 scope.spawn(move |_| {
                     let mut i;
