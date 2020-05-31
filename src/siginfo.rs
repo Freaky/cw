@@ -1,13 +1,13 @@
 #[cfg(unix)]
 mod sig {
     use libc::{c_int, c_void, sighandler_t, signal};
-    use std::cell::RefCell;
+    use std::cell::Cell;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::thread_local;
 
     static SIGINFO_RECEIVED: AtomicUsize = AtomicUsize::new(0);
     thread_local! {
-        static SIGINFO_GEN: RefCell<usize> = RefCell::new(0);
+        static SIGINFO_GEN: Cell<usize> = Cell::new(0);
     }
 
     extern "C" fn trigger_signal(_: c_int) {
@@ -21,9 +21,8 @@ mod sig {
     pub fn check_signal() -> bool {
         SIGINFO_GEN.with(|gen| {
             let current = SIGINFO_RECEIVED.load(Ordering::Acquire);
-            let received = current != *gen.borrow();
-            *gen.borrow_mut() = current;
-            received
+            let prev = gen.replace(current);
+            prev != current
         })
     }
 
