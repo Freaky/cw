@@ -6,10 +6,8 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use structopt::StructOpt;
 
-use crossbeam_channel;
 use crossbeam_utils::thread;
 
-use cw;
 use cw::args::Opt;
 use cw::count::{Counter, Counts, Strategy};
 use cw::siginfo;
