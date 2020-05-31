@@ -1,0 +1,33 @@
+name: build
+on: [push]
+jobs:
+  rustfmt-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: stable
+          components: rustfmt
+      - name: Check rustfmt
+        run: cargo fmt -- --check
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+        rust: [stable, nightly]
+    steps:
+    - uses: actions/checkout@v2
+    - uses: hecrj/setup-rust-action@v1
+      with:
+        rust-version: ${{ matrix.rust }}
+        components: clippy
+    - name: Check clippy
+      run: cargo clippy -- -Dwarnings
+    - name: Build
+      run: cargo build --verbose
+    - name: Build Docs
+      run: cargo doc --verbose
+    - name: Run tests
+      run: cargo test --verbose
