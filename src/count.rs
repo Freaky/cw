@@ -13,6 +13,50 @@ const READ_SIZE: usize = 1024 * 32;
 use crate::args::Opt;
 use crate::siginfo;
 
+// Open a file configured for fast sequential reading
+fn open_file<P: AsRef<Path>>(path: P) -> io::Result<File> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+
+        std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(winapi::um::winbase::FILE_FLAG_SEQUENTIAL_SCAN)
+            .open(path)
+    }
+    #[cfg(not(windows))]
+    {
+        let file = File::open(path)?;
+        advise_sequential(&file);
+        Ok(file)
+    }
+}
+
+#[cfg(not(windows))]
+fn advise_sequential(file: &File) {
+    #[cfg(all(unix, not(target_os = "macos")))]
+    unsafe {
+        use std::os::unix::io::AsRawFd;
+
+        libc::posix_fadvise(
+            file.as_raw_fd(),
+            0, 0,
+            libc::POSIX_FADV_SEQUENTIAL
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    unsafe {
+        use std::os::unix::io::AsRawFd;
+
+        libc::fcntl(
+            file.as_raw_fd(),
+            libc::F_RDAHEAD,
+            1
+        );
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Counts {
     pub path: Option<PathBuf>,
@@ -149,7 +193,9 @@ pub trait Counter {
         let path = path.as_ref();
         let mut count = Counts::new(path);
 
-        File::open(&path).and_then(|fd| self.count(fd, &mut count, &opt))?;
+        open_file(&path).and_then(|fd| {
+            self.count(fd, &mut count, &opt)
+        })?;
         Ok(count)
     }
 }
@@ -210,7 +256,7 @@ impl Counter for BytesOnly {
         if let Some(bytes) = bytes {
             count.bytes = bytes;
         } else {
-            File::open(&path).and_then(|fd| self.count(fd, &mut count, &opt))?;
+            open_file(&path).and_then(|fd| self.count(fd, &mut count, &opt))?;
         }
 
         Ok(count)

@@ -19,6 +19,9 @@ crossbeam-channel = "0.3"
 crossbeam-utils = "0.6"
 bstr = "0.2.0"
 
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3.8", features = ["winbase"] }
+
 [features]
 runtime-dispatch-simd = ["bytecount/runtime-dispatch-simd"]
 generic-simd = ["bytecount/generic-simd"]
