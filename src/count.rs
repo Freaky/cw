@@ -38,22 +38,14 @@ fn advise_sequential(file: &File) {
     unsafe {
         use std::os::unix::io::AsRawFd;
 
-        libc::posix_fadvise(
-            file.as_raw_fd(),
-            0, 0,
-            libc::POSIX_FADV_SEQUENTIAL
-        );
+        libc::posix_fadvise(file.as_raw_fd(), 0, 0, libc::POSIX_FADV_SEQUENTIAL);
     }
 
     #[cfg(target_os = "macos")]
     unsafe {
         use std::os::unix::io::AsRawFd;
 
-        libc::fcntl(
-            file.as_raw_fd(),
-            libc::F_RDAHEAD,
-            1
-        );
+        libc::fcntl(file.as_raw_fd(), libc::F_RDAHEAD, 1);
     }
 }
 
@@ -193,9 +185,7 @@ pub trait Counter {
         let path = path.as_ref();
         let mut count = Counts::new(path);
 
-        open_file(&path).and_then(|fd| {
-            self.count(fd, &mut count, &opt)
-        })?;
+        open_file(&path).and_then(|fd| self.count(fd, &mut count, &opt))?;
         Ok(count)
     }
 }
@@ -517,7 +507,12 @@ impl Counter for CharsWordsLinesLongest {
         //
         // We limit reads to READ_SIZE to place an upper-bound on memory use.
         let mut buf = Vec::with_capacity(READ_SIZE);
-        while reader.by_ref().take(READ_SIZE as u64).read_until(b'\n', &mut buf)? > 0 {
+        while reader
+            .by_ref()
+            .take(READ_SIZE as u64)
+            .read_until(b'\n', &mut buf)?
+            > 0
+        {
             count.bytes += buf.len() as u64;
             for c in buf.chars() {
                 count.chars += 1;
