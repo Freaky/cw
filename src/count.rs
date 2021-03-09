@@ -28,18 +28,17 @@ fn open_file<P: AsRef<Path>>(path: P) -> io::Result<File> {
     {
         let file = File::open(path)?;
 
-        #[cfg(all(unix, not(target_os = "macos")))]
-        unsafe {
+        #[cfg(unix)]
+        {
             use std::os::unix::io::AsRawFd;
 
-            libc::posix_fadvise(file.as_raw_fd(), 0, 0, libc::POSIX_FADV_SEQUENTIAL);
-        }
+            unsafe {
+                #[cfg(target_os = "macos")]
+                libc::fcntl(file.as_raw_fd(), libc::F_RDAHEAD, 1);
 
-        #[cfg(target_os = "macos")]
-        unsafe {
-            use std::os::unix::io::AsRawFd;
-
-            libc::fcntl(file.as_raw_fd(), libc::F_RDAHEAD, 1);
+                #[cfg(not(target_os = "macos"))]
+                libc::posix_fadvise(file.as_raw_fd(), 0, 0, libc::POSIX_FADV_SEQUENTIAL);
+            }
         }
 
         Ok(file)
