@@ -11,12 +11,12 @@ categories = [ "command-line-utilities", "text-processing" ]
 edition = "2018"
 
 [dependencies]
-bytecount = "0.5"
-structopt = "0.2"
+bytecount = "0.6"
+structopt = "0.3"
 libc = "0.2"
 memchr = "2.1"
-crossbeam-channel = "0.3"
-crossbeam-utils = "0.6"
+crossbeam-channel = "0.5"
+crossbeam-utils = "0.8"
 bstr = "0.2.0"
 
 [target.'cfg(windows)'.dependencies]
