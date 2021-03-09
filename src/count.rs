@@ -27,25 +27,22 @@ fn open_file<P: AsRef<Path>>(path: P) -> io::Result<File> {
     #[cfg(not(windows))]
     {
         let file = File::open(path)?;
-        advise_sequential(&file);
+
+        #[cfg(all(unix, not(target_os = "macos")))]
+        unsafe {
+            use std::os::unix::io::AsRawFd;
+
+            libc::posix_fadvise(file.as_raw_fd(), 0, 0, libc::POSIX_FADV_SEQUENTIAL);
+        }
+
+        #[cfg(target_os = "macos")]
+        unsafe {
+            use std::os::unix::io::AsRawFd;
+
+            libc::fcntl(file.as_raw_fd(), libc::F_RDAHEAD, 1);
+        }
+
         Ok(file)
-    }
-}
-
-#[cfg(not(windows))]
-fn advise_sequential(file: &File) {
-    #[cfg(all(unix, not(target_os = "macos")))]
-    unsafe {
-        use std::os::unix::io::AsRawFd;
-
-        libc::posix_fadvise(file.as_raw_fd(), 0, 0, libc::POSIX_FADV_SEQUENTIAL);
-    }
-
-    #[cfg(target_os = "macos")]
-    unsafe {
-        use std::os::unix::io::AsRawFd;
-
-        libc::fcntl(file.as_raw_fd(), libc::F_RDAHEAD, 1);
     }
 }
 
