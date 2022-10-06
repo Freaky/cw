@@ -11,7 +11,7 @@ categories = [ "command-line-utilities", "text-processing" ]
 edition = "2018"
 
 [dependencies]
-bytecount = "0.6"
+bytecount = "0.6.3"
 structopt = "0.3"
 libc = "0.2"
 memchr = "2.1"
